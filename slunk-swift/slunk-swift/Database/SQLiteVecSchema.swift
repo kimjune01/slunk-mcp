@@ -376,11 +376,12 @@ class SQLiteVecSchema {
     
     private func parseTextSummary(from row: [String: Any]) throws -> TextSummary {
         guard let idString = row["id"] as? String,
+              let id = UUID(uuidString: idString),
               let title = row["title"] as? String,
               let content = row["content"] as? String,
               let summary = row["summary"] as? String,
-              let wordCount = row["word_count"] as? Int,
-              let summaryWordCount = row["summary_word_count"] as? Int else {
+              let _ = row["word_count"] as? Int,
+              let _ = row["summary_word_count"] as? Int else {
             throw SQLiteVecSchemaError.queryFailed("Invalid row data - missing required fields")
         }
         
@@ -429,6 +430,48 @@ class SQLiteVecSchema {
             return []
         }
         return array
+    }
+    
+    // MARK: - Analytics & Statistics
+    
+    func getTotalSummaryCount() async throws -> Int {
+        guard let database = database else {
+            throw SQLiteVecSchemaError.databaseNotOpen
+        }
+        
+        let sql = "SELECT COUNT(*) as count FROM text_summaries"
+        
+        do {
+            let results = try await database.query(sql, params: [])
+            if let firstRow = results.first,
+               let count = firstRow["count"] as? Int {
+                return count
+            }
+            return 0
+        } catch {
+            throw SQLiteVecSchemaError.queryFailed("Failed to get total summary count: \(error)")
+        }
+    }
+    
+    func getAllSummaries(limit: Int?) async throws -> [TextSummary] {
+        guard let database = database else {
+            throw SQLiteVecSchemaError.databaseNotOpen
+        }
+        
+        var sql = "SELECT * FROM text_summaries ORDER BY timestamp DESC"
+        var parameters: [Any] = []
+        
+        if let limit = limit {
+            sql += " LIMIT ?"
+            parameters.append(limit)
+        }
+        
+        do {
+            let results = try await database.query(sql, params: parameters)
+            return try results.map { try parseTextSummary(from: $0) }
+        } catch {
+            throw SQLiteVecSchemaError.queryFailed("Failed to get all summaries: \(error)")
+        }
     }
 }
 

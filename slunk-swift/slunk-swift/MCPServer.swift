@@ -176,8 +176,27 @@ class MCPServer {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     
+    // Vector database components
+    private var database: SQLiteVecSchema?
+    private var queryEngine: NaturalLanguageQueryEngine?
+    private var smartIngestion: SmartIngestionService?
+    
     init() {
         setupHandlers()
+        setupVectorComponents()
+    }
+    
+    private func setupVectorComponents() {
+        self.queryEngine = NaturalLanguageQueryEngine()
+        self.smartIngestion = SmartIngestionService()
+    }
+    
+    func setDatabase(_ database: SQLiteVecSchema) {
+        self.database = database
+        self.queryEngine?.setDatabase(database)
+        Task {
+            await self.smartIngestion?.setDatabase(database)
+        }
     }
     
     private func setupHandlers() {
@@ -274,15 +293,40 @@ class MCPServer {
     private func handleToolsList(_ request: JSONRPCRequest) -> JSONRPCResponse {
         let tools: [[String: Any]] = [
             [
-                "name": "createNote",
-                "description": "Create a new note",
+                "name": "searchConversations",
+                "description": "Search conversations using natural language queries with semantic similarity, keyword matching, and temporal filtering",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "title": ["type": "string", "description": "Note title"],
-                        "content": ["type": "string", "description": "Note content"]
+                        "query": ["type": "string", "description": "Natural language search query (e.g., 'Swift meetings with Alice from last week')"],
+                        "limit": ["type": "integer", "description": "Maximum number of results to return", "default": 10]
                     ],
-                    "required": ["title", "content"]
+                    "required": ["query"]
+                ]
+            ],
+            [
+                "name": "ingestText",
+                "description": "Ingest new text content with automatic keyword extraction and embedding generation",
+                "inputSchema": [
+                    "type": "object",
+                    "properties": [
+                        "content": ["type": "string", "description": "The text content to ingest"],
+                        "title": ["type": "string", "description": "Title or subject of the content"],
+                        "summary": ["type": "string", "description": "Brief summary of the content"],
+                        "sender": ["type": "string", "description": "Name or identifier of the content sender"],
+                        "timestamp": ["type": "string", "description": "ISO 8601 timestamp (optional, defaults to current time)"]
+                    ],
+                    "required": ["content", "title", "summary"]
+                ]
+            ],
+            [
+                "name": "getConversationStats",
+                "description": "Get analytics and statistics about stored conversations",
+                "inputSchema": [
+                    "type": "object",
+                    "properties": [
+                        "timeRange": ["type": "string", "description": "Time range for stats: 'day', 'week', 'month', 'all'", "default": "all"]
+                    ]
                 ]
             ],
             [
@@ -314,28 +358,19 @@ class MCPServer {
         let arguments = argumentsValue?.value as? [String: Any] ?? [:]
         
         switch name {
+        case "searchConversations":
+            return await handleSearchConversations(MCPRequest(method: name, params: arguments))
+            
+        case "ingestText":
+            return await handleIngestText(MCPRequest(method: name, params: arguments))
+            
+        case "getConversationStats":
+            return await handleGetConversationStats(MCPRequest(method: name, params: arguments))
+            
         case "swiftVersion":
             let version = MCPServer.swiftVersion() ?? "Unknown"
             return JSONRPCResponse(
                 result: ["content": [["type": "text", "text": version]]],
-                error: nil,
-                id: request.id
-            )
-            
-        case "createNote":
-            guard let title = arguments["title"] as? String,
-                  let _ = arguments["content"] as? String else {
-                return JSONRPCResponse(
-                    result: nil,
-                    error: JSONRPCError(code: -32602, message: "Missing required parameters"),
-                    id: request.id
-                )
-            }
-            
-            // Simulate creating a note
-            let noteId = UUID().uuidString
-            return JSONRPCResponse(
-                result: ["content": [["type": "text", "text": "Created note '\(title)' with ID: \(noteId)"]]],
                 error: nil,
                 id: request.id
             )
@@ -371,6 +406,206 @@ class MCPServer {
         fflush(stderr)
     }
     
+    // MARK: - Enhanced MCP Tool Handlers
+    
+    func handleSearchConversations(_ request: MCPRequest) async -> JSONRPCResponse {
+        guard let database = database,
+              let queryEngine = queryEngine else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Database not available"),
+                id: JSONRPCId.string(request.id)
+            )
+        }
+        
+        guard let query = request.params["query"] as? String else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32602, message: "Missing required parameter: query"),
+                id: JSONRPCId.string(request.id)
+            )
+        }
+        
+        let limit = request.params["limit"] as? Int ?? 10
+        
+        do {
+            let parsedQuery = queryEngine.parseQuery(query)
+            let results = try await queryEngine.executeHybridSearch(parsedQuery, limit: limit)
+            
+            let searchResults = results.map { result in
+                [
+                    "id": result.summary.id.uuidString,
+                    "title": result.summary.title,
+                    "summary": result.summary.summary,
+                    "sender": result.summary.sender ?? "Unknown",
+                    "timestamp": ISO8601DateFormatter().string(from: result.summary.timestamp),
+                    "score": result.combinedScore,
+                    "matchedKeywords": result.matchedKeywords
+                ] as [String: Any]
+            }
+            
+            return JSONRPCResponse(
+                result: searchResults,
+                error: nil,
+                id: JSONRPCId.string(request.id)
+            )
+            
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Search failed: \(error.localizedDescription)"),
+                id: JSONRPCId.string(request.id)
+            )
+        }
+    }
+    
+    func handleIngestText(_ request: MCPRequest) async -> JSONRPCResponse {
+        guard let smartIngestion = smartIngestion else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Ingestion service not available"),
+                id: JSONRPCId.string(request.id)
+            )
+        }
+        
+        guard let content = request.params["content"] as? String,
+              let title = request.params["title"] as? String,
+              let summary = request.params["summary"] as? String else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32602, message: "Missing required parameters: content, title, summary"),
+                id: JSONRPCId.string(request.id)
+            )
+        }
+        
+        let sender = request.params["sender"] as? String
+        let timestamp: Date?
+        
+        if let timestampString = request.params["timestamp"] as? String {
+            timestamp = ISO8601DateFormatter().date(from: timestampString)
+        } else {
+            timestamp = nil
+        }
+        
+        do {
+            let result = try await smartIngestion.ingestText(
+                content: content,
+                title: title,
+                summary: summary,
+                sender: sender,
+                timestamp: timestamp
+            )
+            
+            let response = [
+                "id": result.summaryId,
+                "keywords": result.extractedKeywords,
+                "embeddingDimensions": result.embeddingDimensions,
+                "processingTime": result.processingTime
+            ] as [String: Any]
+            
+            return JSONRPCResponse(
+                result: response,
+                error: nil,
+                id: JSONRPCId.string(request.id)
+            )
+            
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Ingestion failed: \(error.localizedDescription)"),
+                id: JSONRPCId.string(request.id)
+            )
+        }
+    }
+    
+    func handleGetConversationStats(_ request: MCPRequest) async -> JSONRPCResponse {
+        guard let database = database else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Database not available"),
+                id: JSONRPCId.string(request.id)
+            )
+        }
+        
+        let timeRange = request.params["timeRange"] as? String ?? "all"
+        
+        do {
+            let stats = try await generateConversationStats(database: database, timeRange: timeRange)
+            
+            return JSONRPCResponse(
+                result: stats,
+                error: nil,
+                id: JSONRPCId.string(request.id)
+            )
+            
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Stats generation failed: \(error.localizedDescription)"),
+                id: JSONRPCId.string(request.id)
+            )
+        }
+    }
+    
+    func handleRequest(_ request: MCPRequest) async -> JSONRPCResponse {
+        // Generic handler for tests - just calls the specific handlers
+        switch request.method {
+        case "searchConversations":
+            return await handleSearchConversations(request)
+        case "ingestText":
+            return await handleIngestText(request)
+        case "getConversationStats":
+            return await handleGetConversationStats(request)
+        default:
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32601, message: "Method not found"),
+                id: JSONRPCId.string(request.id)
+            )
+        }
+    }
+    
+    private func generateConversationStats(database: SQLiteVecSchema, timeRange: String) async throws -> [String: Any] {
+        // Use SQL aggregate functions for analytics
+        let totalConversations = try await database.getTotalSummaryCount()
+        
+        // Get unique keywords count
+        let allSummaries = try await database.getAllSummaries(limit: nil)
+        let allKeywords = allSummaries.flatMap { $0.keywords }
+        let uniqueKeywords = Set(allKeywords)
+        
+        // Get date range
+        let timestamps = allSummaries.map { $0.timestamp }
+        let earliestDate = timestamps.min()
+        let latestDate = timestamps.max()
+        
+        // Get top keywords by frequency
+        let keywordCounts = Dictionary(grouping: allKeywords, by: { $0 })
+            .mapValues { $0.count }
+            .sorted { $0.value > $1.value }
+        let topKeywords = Array(keywordCounts.prefix(10))
+        
+        // Get sender statistics
+        let senders = allSummaries.compactMap { $0.sender }
+        let senderCounts = Dictionary(grouping: senders, by: { $0 })
+            .mapValues { $0.count }
+            .sorted { $0.value > $1.value }
+        
+        let stats: [String: Any] = [
+            "totalConversations": totalConversations,
+            "totalKeywords": uniqueKeywords.count,
+            "dateRange": [
+                "earliest": earliestDate?.timeIntervalSince1970 ?? 0,
+                "latest": latestDate?.timeIntervalSince1970 ?? 0
+            ],
+            "topKeywords": topKeywords.map { ["keyword": $0.key, "count": $0.value] },
+            "topSenders": senderCounts.map { ["sender": $0.key, "count": $0.value] },
+            "timeRange": timeRange
+        ]
+        
+        return stats
+    }
+    
     static func swiftVersion() -> String? {
         // Since we're in an App Sandbox, we can't execute external processes
         // Instead, return the Swift version this app was compiled with
@@ -386,4 +621,13 @@ class MCPServer {
             return "Apple Swift version 5.x+ (compiled with this app)\nTarget: arm64-apple-macosx\nNote: App is sandboxed, cannot execute external swift command"
         #endif
     }
+}
+
+// MARK: - Test Support Types
+
+struct MCPRequest {
+    let method: String
+    let params: [String: Any]
+    let jsonrpc: String = "2.0"
+    let id: String = UUID().uuidString
 }
