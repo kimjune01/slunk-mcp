@@ -1,52 +1,79 @@
-import MCP
 import Foundation
+import Combine
+import AppKit
 
-struct ServerManager {
-    static func start() {
+class ServerManager: ObservableObject {
+    @Published var isRunning = false
+    @Published var logs: [String] = []
+    @Published var mcpConfig: String = ""
+    
+    private var mcpServer: MCPServer?
+    private let maxLogs = 100
+    
+    init() {
+        mcpServer = MCPServer()
+    }
+    
+    func start() {
+        guard !isRunning else { return }
+        
+        mcpServer?.start()
+        isRunning = true
+        
+        // Get the path to the current executable
+        let executablePath = Bundle.main.executablePath ?? "Unknown path"
+        
+        // Generate MCP config JSON
+        let configJSON = """
+{
+  "mcpServers": {
+    "slunk": {
+      "command": "\(executablePath)",
+      "args": [],
+      "transport": "stdio"
+    }
+  }
+}
+"""
+        mcpConfig = configJSON
+        
+        addLog("Server started (stdio transport)")
+        addLog("📍 Executable path: \(executablePath)")
+        addLog("💡 MCP config ready - use copy button above")
+        
+        // Simulate some initial activity
         Task {
-            let server = Server(
-                name: "Swift Version Server",
-                version: "0.1.0",
-                capabilities: .init(tools: .init(listChanged: false))
-            )
-            let transport = StdioTransport()
-            try await server.start(transport: transport)
-            let tool = Tool(name: "swift_version",
-                            description: "Returns the current Swift version",
-                            inputSchema: .object([
-                                "type": .string("object")
-                            ]))
-            await server.withMethodHandler(ListTools.self) { params in
-                ListTools.Result(tools: [tool])
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            await MainActor.run {
+                addLog("Waiting for JSON-RPC messages on stdin...")
             }
-            await server.withMethodHandler(CallTool.self) { params in
-                guard params.name == tool.name else {
-                    throw MCPError.invalidParams("Wrong tool name: \(params.name)")
-                }
-                return CallTool.Result(content: [.text(self.swiftVersion() ?? "No version")])
-            }
-            print(server)
-            await server.waitUntilCompleted()
         }
     }
     
+    func stop() {
+        guard isRunning else { return }
+        
+        mcpServer?.stop()
+        isRunning = false
+        addLog("Server stopped")
+    }
     
-    static func swiftVersion() -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["swift", "--version"]
+    private func addLog(_ message: String) {
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        let logEntry = "[\(timestamp)] \(message)"
         
-        let outputPipe = Pipe()
-        process.standardOutput = outputPipe
+        logs.append(logEntry)
         
-        do {
-            try process.run()
-            process.waitUntilExit()
-            
-            let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-            return String(data: data, encoding: .utf8)
-        } catch {
-            return "Error running swift-version: \(error)"
+        // Keep only the last N logs
+        if logs.count > maxLogs {
+            logs.removeFirst(logs.count - maxLogs)
         }
+    }
+    
+    func copyMCPConfig() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(mcpConfig, forType: .string)
+        addLog("📋 MCP config copied to clipboard!")
     }
 }
