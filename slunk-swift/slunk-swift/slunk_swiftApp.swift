@@ -9,9 +9,16 @@ import SwiftUI
 
 @main
 struct slunk_swiftApp: App {
+    let mcpServer = MCPServer()
+    init() {
+        
+    }
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onAppear {
+                    mcpServer.start()
+                }
         }
     }
 }

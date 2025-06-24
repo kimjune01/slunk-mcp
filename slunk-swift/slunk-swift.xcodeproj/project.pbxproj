@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		0ECDE8D32E0B136C0020E1EB /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 0ECDE8D22E0B136C0020E1EB /* GRDB */; };
+		0ECDE8D52E0B13780020E1EB /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = 0ECDE8D42E0B13780020E1EB /* MCP */; };
+		0ECDE8DA2E0B1BD80020E1EB /* Swifter in Frameworks */ = {isa = PBXBuildFile; productRef = 0ECDE8D92E0B1BD80020E1EB /* Swifter */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		0ECDE8AF2E0AEE1F0020E1EB /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +58,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0ECDE8DA2E0B1BD80020E1EB /* Swifter in Frameworks */,
+				0ECDE8D32E0B136C0020E1EB /* GRDB in Frameworks */,
+				0ECDE8D52E0B13780020E1EB /* MCP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +87,7 @@
 				0ECDE8A22E0AEE1E0020E1EB /* slunk-swift */,
 				0ECDE8B12E0AEE1F0020E1EB /* slunk-swiftTests */,
 				0ECDE8BB2E0AEE1F0020E1EB /* slunk-swiftUITests */,
+				0ECDE8D12E0B136C0020E1EB /* Frameworks */,
 				0ECDE8A12E0AEE1E0020E1EB /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +100,13 @@
 				0ECDE8B82E0AEE1F0020E1EB /* slunk-swiftUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		0ECDE8D12E0B136C0020E1EB /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -112,6 +129,9 @@
 			);
 			name = "slunk-swift";
 			packageProductDependencies = (
+				0ECDE8D22E0B136C0020E1EB /* GRDB */,
+				0ECDE8D42E0B13780020E1EB /* MCP */,
+				0ECDE8D92E0B1BD80020E1EB /* Swifter */,
 			);
 			productName = "slunk-swift";
 			productReference = 0ECDE8A02E0AEE1E0020E1EB /* slunk-swift.app */;
@@ -195,6 +215,13 @@
 			);
 			mainGroup = 0ECDE8972E0AEE1E0020E1EB;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				0ECDE8CD2E0B12470020E1EB /* XCRemoteSwiftPackageReference "swift-sdk" */,
+				0ECDE8CE2E0B126D0020E1EB /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				0ECDE8CF2E0B12790020E1EB /* XCRemoteSwiftPackageReference "SQLiteVec" */,
+				0ECDE8D02E0B128A0020E1EB /* XCRemoteSwiftPackageReference "AXSwift" */,
+				0ECDE8D82E0B1BCA0020E1EB /* XCRemoteSwiftPackageReference "swifter" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0ECDE8A12E0AEE1E0020E1EB /* Products */;
 			projectDirPath = "";
@@ -551,6 +578,67 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		0ECDE8CD2E0B12470020E1EB /* XCRemoteSwiftPackageReference "swift-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/modelcontextprotocol/swift-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.0;
+			};
+		};
+		0ECDE8CE2E0B126D0020E1EB /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
+		0ECDE8CF2E0B12790020E1EB /* XCRemoteSwiftPackageReference "SQLiteVec" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jkrukowski/SQLiteVec.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.13;
+			};
+		};
+		0ECDE8D02E0B128A0020E1EB /* XCRemoteSwiftPackageReference "AXSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tmandry/AXSwift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.3.2;
+			};
+		};
+		0ECDE8D82E0B1BCA0020E1EB /* XCRemoteSwiftPackageReference "swifter" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/httpswift/swifter.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0ECDE8D22E0B136C0020E1EB /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0ECDE8CE2E0B126D0020E1EB /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		0ECDE8D42E0B13780020E1EB /* MCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0ECDE8CD2E0B12470020E1EB /* XCRemoteSwiftPackageReference "swift-sdk" */;
+			productName = MCP;
+		};
+		0ECDE8D92E0B1BD80020E1EB /* Swifter */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0ECDE8D82E0B1BCA0020E1EB /* XCRemoteSwiftPackageReference "swifter" */;
+			productName = Swifter;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 0ECDE8982E0AEE1E0020E1EB /* Project object */;
 }
