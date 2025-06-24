@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0E9B72312E0B560C006DF883 /* SQLiteVec in Frameworks */ = {isa = PBXBuildFile; productRef = 0E9B72302E0B560C006DF883 /* SQLiteVec */; };
 		0ECDE8D32E0B136C0020E1EB /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 0ECDE8D22E0B136C0020E1EB /* GRDB */; };
 		0ECDE8D52E0B13780020E1EB /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = 0ECDE8D42E0B13780020E1EB /* MCP */; };
 		0ECDE8DA2E0B1BD80020E1EB /* Swifter in Frameworks */ = {isa = PBXBuildFile; productRef = 0ECDE8D92E0B1BD80020E1EB /* Swifter */; };
@@ -59,6 +60,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0ECDE8DA2E0B1BD80020E1EB /* Swifter in Frameworks */,
+				0E9B72312E0B560C006DF883 /* SQLiteVec in Frameworks */,
 				0ECDE8D32E0B136C0020E1EB /* GRDB in Frameworks */,
 				0ECDE8D52E0B13780020E1EB /* MCP in Frameworks */,
 			);
@@ -132,6 +134,7 @@
 				0ECDE8D22E0B136C0020E1EB /* GRDB */,
 				0ECDE8D42E0B13780020E1EB /* MCP */,
 				0ECDE8D92E0B1BD80020E1EB /* Swifter */,
+				0E9B72302E0B560C006DF883 /* SQLiteVec */,
 			);
 			productName = "slunk-swift";
 			productReference = 0ECDE8A02E0AEE1E0020E1EB /* slunk-swift.app */;
@@ -623,6 +626,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		0E9B72302E0B560C006DF883 /* SQLiteVec */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0ECDE8CF2E0B12790020E1EB /* XCRemoteSwiftPackageReference "SQLiteVec" */;
+			productName = SQLiteVec;
+		};
 		0ECDE8D22E0B136C0020E1EB /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0ECDE8CE2E0B126D0020E1EB /* XCRemoteSwiftPackageReference "GRDB.swift" */;
