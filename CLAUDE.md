@@ -58,4 +58,24 @@ xcodebuild test -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift
 
 ## Key Integration Points
 
-The MCP server is designed to be consumed by Claude Desktop or other MCP clients. The Swift app appears to be a separate client application, though the integration between them is not yet implemented in the current codebase.
+The MCP server is designed to be consumed by Claude Desktop or other MCP clients. The Swift app provides a complete MCP server implementation with stdio transport.
+
+## Testing MCP Functionality
+
+To verify the MCP server works correctly:
+
+```bash
+# Test initialize method
+echo '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}' | /path/to/slunk-swift.app/Contents/MacOS/slunk-swift
+
+# Test tools list
+echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}' | /path/to/slunk-swift.app/Contents/MacOS/slunk-swift
+
+# Test swiftVersion tool
+echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"swiftVersion","arguments":{}},"id":3}' | /path/to/slunk-swift.app/Contents/MacOS/slunk-swift
+
+# Test createNote tool
+echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"createNote","arguments":{"title":"Test","content":"Hello World"}},"id":4}' | /path/to/slunk-swift.app/Contents/MacOS/slunk-swift
+```
+
+The app's UI provides a "Copy Config" button that generates the complete MCP client configuration JSON ready for use in `claude_desktop_config.json`.
