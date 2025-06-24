@@ -18,6 +18,8 @@ class SQLiteVecSchema {
     // MARK: - Database Setup
     
     func initializeDatabase() async throws {
+        // Initialize SQLiteVec library first
+        try SQLiteVec.initialize()
         try openDatabase()
         try await createVectorTable()
     }
