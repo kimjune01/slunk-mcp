@@ -74,7 +74,7 @@ actor SlackMessageParser {
         // Look for sender in main children
         
         // Extract sender and timestamp from main children
-        for (childIndex, child) in mainChildren.enumerated() {
+        for (_, child) in mainChildren.enumerated() {
             if let childElement = child as? Element {
                 // Try multiple attributes for sender name
                 if let role = try? childElement.getAttributeValue(.role) as? Role {
@@ -85,12 +85,12 @@ actor SlackMessageParser {
                         let buttonValue = try childElement.getValue()
                         let potentialSender = buttonTitle ?? buttonValue
                         
-                        // Filter out buttons that are clearly not senders
+                        // Filter out buttons that are clearly not senders (but keep reply buttons for thread detection)
                         if let s = potentialSender, 
-                           !s.contains("replies") && 
                            !s.contains("reaction") && 
-                           !s.contains("thread") &&
                            !s.contains("edited") &&
+                           !s.lowercased().contains("reply") &&
+                           !s.lowercased().contains("replies") &&
                            !s.isEmpty {
                             sender = s
                             print("   ✅ Found sender from button: '\(s)'")
@@ -150,8 +150,9 @@ actor SlackMessageParser {
             }
         }
         
-        // Extract message content using tree traversal
-        let content = try await extractMessageContent(from: mainGroup)
+        // Extract message content with thread detection using tree traversal
+        let contentResult = try await extractMessageContentWithThreads(from: mainGroup)
+        let content = contentResult.content
         
         // If we have content but no sender, use a placeholder
         if let content = content, !content.isEmpty, sender == nil {
@@ -185,6 +186,109 @@ actor SlackMessageParser {
         )
         
         return content?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    // MARK: - Enhanced Thread Content Detection
+    
+    /// Result structure for enhanced content extraction with thread info
+    /// Based on reference SlackParser.swift:295-300
+    private struct ContentResult {
+        let content: String?
+        let isThread: Bool
+        let threadInfo: [String]
+    }
+    
+    /// Extract message content with thread detection
+    /// Based on reference SlackParser.swift:302-390
+    private func extractMessageContentWithThreads(from element: Element) async throws -> ContentResult {
+        var threadInfo: [String] = []
+        var contentParts: [String] = []
+        var hasThreadButtons = false
+        
+        // Traverse the element tree to find thread indicators and content
+        try await traverseForThreadContent(element, threadInfo: &threadInfo, contentParts: &contentParts, hasThreadButtons: &hasThreadButtons)
+        
+        let mainContent = contentParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Enhance content with thread information if present
+        let finalContent: String
+        if !threadInfo.isEmpty {
+            finalContent = "\(mainContent) (\(threadInfo.joined(separator: ", ")))"
+        } else {
+            finalContent = mainContent
+        }
+        
+        return ContentResult(
+            content: finalContent.isEmpty ? nil : finalContent,
+            isThread: !threadInfo.isEmpty,
+            threadInfo: threadInfo
+        )
+    }
+    
+    /// Recursively traverse element tree to collect thread info and content
+    /// Based on reference SlackParser.swift:317-355 rule patterns
+    private func traverseForThreadContent(
+        _ element: Element,
+        threadInfo: inout [String],
+        contentParts: inout [String],
+        hasThreadButtons: inout Bool
+    ) async throws {
+        
+        // Check current element for thread indicators
+        if let role = try? element.getAttributeValue(.role) as? Role {
+            
+            // Thread button detection (reference lines 318-324)
+            if role == .button {
+                if let title = try? element.getAttributeValue(.title) as? String {
+                    if title.lowercased().contains("reply") || title.lowercased().contains("replies") {
+                        threadInfo.append(title)
+                        hasThreadButtons = true
+                        return // Don't process children of thread buttons
+                    }
+                }
+            }
+            
+            // Thread group detection (reference lines 332-338)
+            else if role == .group {
+                // Check if this group contains "Last reply" text
+                if let children = try? element.getChildren() {
+                    for child in children {
+                        if let childElement = child as? Element,
+                           let value = try? childElement.getValue(),
+                           value.contains("Last reply") {
+                            threadInfo.append(value)
+                            return // Don't process other children
+                        }
+                    }
+                }
+            }
+            
+            // Static text content collection (reference lines 339-354)
+            else if role == .staticText {
+                if let value = try? element.getValue(),
+                   !value.isEmpty,
+                   value != "\u{00A0}\u{00A0}" { // Skip non-breaking spaces
+                    
+                    // If we have thread buttons, collect as thread info
+                    if hasThreadButtons {
+                        threadInfo.append(value)
+                    } else {
+                        // Otherwise collect as regular content
+                        contentParts.append(value)
+                    }
+                    return // Don't traverse children of text elements
+                }
+            }
+        }
+        
+        // Recursively traverse children
+        if let children = try? element.getChildren() {
+            for child in children {
+                if let childElement = child as? Element {
+                    try await traverseForThreadContent(childElement, threadInfo: &threadInfo, contentParts: &contentParts, hasThreadButtons: &hasThreadButtons)
+                }
+            }
+        }
     }
     
     // MARK: - Helper Methods
