@@ -21,7 +21,7 @@ class ProductionService: ObservableObject {
     
     // MARK: - Initialization
     
-    func initialize() async {
+    func initialize() async throws {
         isLoading = true
         defer { isLoading = false }
         
@@ -29,7 +29,7 @@ class ProductionService: ObservableObject {
             // Initialize database
             Logger.shared.logDatabaseOperation("Initializing production database")
             let dbPath = Configuration.shared.databaseURL.path
-            schema = try SQLiteVecSchema(databasePath: dbPath)
+            schema = SQLiteVecSchema(databasePath: dbPath)
             
             guard let schema = schema else {
                 throw SlunkError.databaseInitializationFailed("Schema creation failed")
@@ -188,7 +188,7 @@ class ProductionService: ObservableObject {
             let result = try await seeder.seedIfEmpty()
             
             Logger.shared.logDatabaseOperation(
-                "Seeded \(result.conversationsAdded) conversations in \(String(format: "%.2f", result.timeTaken))s"
+                "Seeded \(result.itemsSeeded) conversations in \(String(format: "%.2f", result.processingTime))s"
             )
         } catch {
             Logger.shared.logDatabaseError(error, context: "seedInitialData")
@@ -300,16 +300,21 @@ extension ProductionService {
                 let query = params?["query"] as? String ?? ""
                 let limit = params?["limit"] as? Int ?? Configuration.Query.defaultLimit
                 
-                guard let schema = schema, let engine = queryEngine else {
-                    throw SlunkError.resourceNotFound("Required services not available")
+                guard let engine = queryEngine else {
+                    throw SlunkError.resourceNotFound("Query engine not available")
                 }
                 
-                result = try await MCPServer.searchConversations(
-                    query: query,
-                    limit: limit,
-                    schema: schema,
-                    queryEngine: engine
-                )
+                let parsedQuery = engine.parseQuery(query)
+                let searchResults = try await engine.safeExecuteHybridSearch(parsedQuery, limit: limit)
+                
+                result = searchResults.map { queryResult in
+                    [
+                        "id": queryResult.summary.id.uuidString,
+                        "title": queryResult.summary.title,
+                        "summary": queryResult.summary.summary,
+                        "score": queryResult.combinedScore
+                    ]
+                }
                 
             case "ingestText":
                 let content = params?["content"] as? String ?? ""
@@ -321,20 +326,32 @@ extension ProductionService {
                     throw SlunkError.resourceNotFound("Ingestion service not available")
                 }
                 
-                result = try await MCPServer.ingestText(
+                let ingestionResult = try await ingestion.ingestText(
                     content: content,
                     title: title,
-                    summary: summary,
-                    sender: sender,
-                    smartIngestion: ingestion
+                    summary: summary.isEmpty ? content : summary,
+                    sender: sender
                 )
+                
+                result = [
+                    "id": ingestionResult.summaryId,
+                    "keywords": ingestionResult.extractedKeywords,
+                    "processingTime": ingestionResult.processingTime,
+                    "embeddingDimensions": ingestionResult.embeddingDimensions
+                ]
                 
             case "getConversationStats":
                 guard let schema = schema else {
                     throw SlunkError.resourceNotFound("Database not available")
                 }
                 
-                result = try await MCPServer.getConversationStats(schema: schema)
+                let totalCount = try await schema.getTotalSummaryCount()
+                
+                result = [
+                    "totalConversations": totalCount,
+                    "databaseSize": statistics?.formattedDatabaseSize ?? "Unknown",
+                    "lastUpdated": ISO8601DateFormatter().string(from: Date())
+                ]
                 
             default:
                 throw SlunkError.invalidInput("Unknown method: \(method)")

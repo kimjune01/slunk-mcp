@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Slunk is a hybrid project consisting of:
 1. A Python-based MCP (Model Context Protocol) server using FastMCP
-2. A Swift/SwiftUI iOS application
+2. A Swift/SwiftUI macOS application with Slack monitoring and accessibility features
 
 ## Development Commands
 
@@ -29,8 +29,11 @@ uv run ruff format .
 ### Swift Application
 
 ```bash
-# Build the iOS app
+# Build the macOS app
 xcodebuild -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift build
+
+# Run the app directly
+open /Users/junekim/Library/Developer/Xcode/DerivedData/slunk-swift-*/Build/Products/Debug/slunk-swift.app
 
 # Run tests
 xcodebuild test -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift
@@ -45,10 +48,25 @@ xcodebuild test -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift
 - Entry point: `server.py:14` - `mcp.run()`
 
 ### Swift Application
-- Standard SwiftUI app structure
+- Standard SwiftUI macOS app structure
 - Main app entry: `slunk-swift/slunk-swift/slunk_swiftApp.swift`
 - UI entry: `slunk-swift/slunk-swift/ContentView.swift`
-- Currently displays a basic "Hello, world!" view
+- Features MCP server management, accessibility testing, and Slack monitoring UI
+
+#### Slack Monitoring System
+- **SlackMonitoringService**: Real-time Slack application detection and monitoring
+  - Location: `slunk-swift/slunk-swift/SlackScraper/Observer/SlackMonitoringService.swift`
+  - Detects Slack by bundle ID and application name
+  - Monitors application focus state (active/inactive)
+  - Polling interval: 1 second for responsive detection
+  - Provides detailed console logging and UI status updates
+
+#### Accessibility Framework
+- **AccessibilityManager**: Handles macOS accessibility permissions
+- **ElementMatchers**: Pattern matching for UI elements
+- **SlackUIParser**: Parses Slack interface elements
+- **DeadlineManager**: Manages operation timeouts
+- Comprehensive test suite for all accessibility components
 
 ### Project Configuration
 - Python dependencies managed by `uv` (see `pyproject.toml` and `uv.lock`)
@@ -58,7 +76,37 @@ xcodebuild test -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift
 
 ## Key Integration Points
 
-The MCP server is designed to be consumed by Claude Desktop or other MCP clients. The Swift app provides a complete MCP server implementation with stdio transport.
+The MCP server is designed to be consumed by Claude Desktop or other MCP clients. The Swift app provides a complete MCP server implementation with stdio transport and real-time Slack monitoring capabilities.
+
+## Current Status & Features
+
+### ✅ Implemented Features
+1. **MCP Server Integration**: Full stdio transport MCP server
+2. **Slack Detection**: Real-time monitoring with bundle ID and name detection
+3. **Accessibility Framework**: Complete accessibility API integration
+4. **UI Management**: SwiftUI interface for server control and monitoring
+5. **Test Suite**: Comprehensive testing for all components
+
+### 🚧 In Development
+- Slack content parsing and extraction
+- Advanced accessibility element traversal
+- Data persistence and export features
+
+### 🔧 Manual Testing
+
+#### Slack Monitoring Test
+1. Launch the app: `open /path/to/slunk-swift.app`
+2. Click "🔍 Start Slack Monitoring"
+3. Open/close Slack or switch focus
+4. Observe real-time console output:
+   - ✅ `SLACK DETECTED! Slack is active and ready for monitoring`
+   - 🟡 `Slack is running but not in focus`
+   - 🔍 `Scanning for Slack... (not currently running)`
+
+#### Accessibility Testing
+1. Click "🧪 Run Tests" in the app
+2. Grant accessibility permissions when prompted
+3. View detailed test results in the UI and system console
 
 ## Testing MCP Functionality
 
