@@ -4,6 +4,8 @@ import SQLiteVec
 
 // MARK: - Slack-Specific Database Schema with Deduplication
 
+/// Database schema manager for Slack message storage with deduplication and vector search
+/// Integrates GRDB for relational data and SQLiteVec for semantic search capabilities
 class SlackDatabaseSchema {
     let databaseURL: URL
     var database: DatabaseQueue?
@@ -26,13 +28,22 @@ class SlackDatabaseSchema {
     // MARK: - Database Setup
     
     func initializeDatabase() async throws {
+        // Initialize SQLiteVec extension
         try SQLiteVec.initialize()
+        
+        // Open database connection
         try openDatabase()
+        
+        // Create all tables and indexes
+        try await createAllTables()
+        try await createIndexes()
+    }
+    
+    private func createAllTables() async throws {
         try await createSlackMessageTable()
         try await createReactionsTable()
         try await createIngestionLogTable()
         try await createVectorTable()
-        try await createIndexes()
     }
     
     static func getPersistentDatabaseURL() throws -> URL {
