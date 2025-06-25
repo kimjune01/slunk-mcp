@@ -39,20 +39,26 @@ public struct SlackMessage: Codable, Sendable {
     
     public struct MessageMetadata: Codable, Sendable {
         public let editedAt: Date?
-        public let reactions: [String]?
+        public let reactions: [String: Int]?    // emoji -> count mapping
         public let mentions: [String]?
-        public let attachments: [String]?
+        public let attachmentNames: [String]?   // file names only
+        public let contentHash: String?         // for deduplication
+        public let version: Int                 // for tracking edits
         
         public init(
             editedAt: Date? = nil,
-            reactions: [String]? = nil,
+            reactions: [String: Int]? = nil,
             mentions: [String]? = nil,
-            attachments: [String]? = nil
+            attachmentNames: [String]? = nil,
+            contentHash: String? = nil,
+            version: Int = 1
         ) {
             self.editedAt = editedAt
             self.reactions = reactions
             self.mentions = mentions
-            self.attachments = attachments
+            self.attachmentNames = attachmentNames
+            self.contentHash = contentHash
+            self.version = version
         }
     }
 }
@@ -216,7 +222,61 @@ extension SlackMessage: Validatable {
 
 extension SlackMessage: Deduplicatable {
     public var deduplicationKey: String {
-        return "\(sender):\(timestamp.timeIntervalSince1970):\(content.hashValueForDeduplication)"
+        // Use timestamp as primary key (Slack's message ID format)
+        return "\(timestamp.timeIntervalSince1970)"
+    }
+    
+    public var contentHash: String {
+        let hashContent = "\(content)\(sender)\(timestamp.timeIntervalSince1970)"
+        return hashContent.sha256Hash
+    }
+    
+    public func createUpdatedVersion(newContent: String, editedAt: Date) -> SlackMessage {
+        let newVersion = (metadata?.version ?? 1) + 1
+        let newMetadata = MessageMetadata(
+            editedAt: editedAt,
+            reactions: metadata?.reactions,
+            mentions: metadata?.mentions,
+            attachmentNames: metadata?.attachmentNames,
+            contentHash: SlackMessage.generateContentHash(content: newContent, sender: sender, timestamp: timestamp),
+            version: newVersion
+        )
+        
+        return SlackMessage(
+            id: id,
+            timestamp: timestamp,
+            sender: sender,
+            content: newContent,
+            threadId: threadId,
+            messageType: messageType,
+            metadata: newMetadata
+        )
+    }
+    
+    public func updateReactions(_ newReactions: [String: Int]) -> SlackMessage {
+        let newMetadata = MessageMetadata(
+            editedAt: metadata?.editedAt,
+            reactions: newReactions,
+            mentions: metadata?.mentions,
+            attachmentNames: metadata?.attachmentNames,
+            contentHash: metadata?.contentHash,
+            version: metadata?.version ?? 1
+        )
+        
+        return SlackMessage(
+            id: id,
+            timestamp: timestamp,
+            sender: sender,
+            content: content,
+            threadId: threadId,
+            messageType: messageType,
+            metadata: newMetadata
+        )
+    }
+    
+    public static func generateContentHash(content: String, sender: String, timestamp: Date) -> String {
+        let hashContent = "\(content)\(sender)\(timestamp.timeIntervalSince1970)"
+        return hashContent.sha256Hash
     }
 }
 

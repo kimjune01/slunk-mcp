@@ -15,6 +15,12 @@ extension String: DeduplicateHashable {
         let hashInt = hash.prefix(8).reduce(0) { ($0 << 8) | Int($1) }
         return hashInt
     }
+    
+    public var sha256Hash: String {
+        let data = Data(self.utf8)
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
+    }
 
     public func containsIgnoringCase(_ other: String) -> Bool {
         return self.range(of: other, options: .caseInsensitive) != nil

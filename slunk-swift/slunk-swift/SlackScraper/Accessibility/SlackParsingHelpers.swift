@@ -70,24 +70,93 @@ public struct SlackParsingHelpers {
             .replacingOccurrences(of: #"\n+"#, with: "\n", options: .regularExpression)
     }
     
-    /// Extract mentions from message content
+    /// Extract mentions from message content (enhanced for Slack patterns)
     static func extractMentions(from content: String) -> [String] {
-        let mentionPattern = #"@([a-zA-Z0-9._-]+)"#
-        let regex = try? NSRegularExpression(pattern: mentionPattern)
-        let range = NSRange(content.startIndex..<content.endIndex, in: content)
-        
         var mentions: [String] = []
         
-        if let regex = regex {
+        // Pattern 1: Standard @username mentions
+        let mentionPattern = #"@([a-zA-Z0-9._-]+)"#
+        if let regex = try? NSRegularExpression(pattern: mentionPattern) {
+            let range = NSRange(content.startIndex..<content.endIndex, in: content)
             let matches = regex.matches(in: content, options: [], range: range)
             for match in matches {
                 if let mentionRange = Range(match.range(at: 1), in: content) {
-                    mentions.append(String(content[mentionRange]))
+                    let mention = "@" + String(content[mentionRange])
+                    mentions.append(mention)
+                }
+            }
+        }
+        
+        // Pattern 2: Special mentions (@channel, @here, @everyone)
+        let specialMentions = ["@channel", "@here", "@everyone"]
+        for specialMention in specialMentions {
+            if content.localizedCaseInsensitiveContains(specialMention) {
+                mentions.append(specialMention)
+            }
+        }
+        
+        // Pattern 3: Display name mentions (sometimes Slack shows "John Doe" instead of @johndoe)
+        let displayNameMentions = extractDisplayNameMentions(from: content)
+        mentions.append(contentsOf: displayNameMentions)
+        
+        let finalMentions = Array(Set(mentions)) // Remove duplicates
+        return finalMentions
+    }
+    
+    /// Extract display name mentions from content (names that appear to be user mentions)
+    private static func extractDisplayNameMentions(from content: String) -> [String] {
+        var mentions: [String] = []
+        
+        // Pattern for common name formats that might be mentions in Slack
+        // Look for capitalized words that could be names, but be conservative
+        let namePatterns = [
+            // Pattern 1: "Welcome Sofia" - single capitalized names in welcome contexts
+            #"(?:welcome|hi|hello|thanks)\s+([A-Z][a-z]{2,15})(?:\s|$|[,.!])"#,
+            
+            // Pattern 2: "Thanks John" or "Great work Alice"
+            #"(?:thanks|thank you|great work|nice job|well done)\s+([A-Z][a-z]{2,15})(?:\s|$|[,.!])"#,
+            
+            // Pattern 3: Names followed by specific patterns that suggest they're user references
+            #"([A-Z][a-z]{2,15})\s+(?:is|has|will|was|did|said)"#,
+            
+            // Pattern 4: Greetings with names
+            #"(?:^|\s)([A-Z][a-z]{2,15})(?:'s|,\s+(?:how|what|where|when))"#
+        ]
+        
+        for pattern in namePatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+                let matches = regex.matches(in: content, range: NSRange(content.startIndex..., in: content))
+                for match in matches {
+                    if let nameRange = Range(match.range(at: 1), in: content) {
+                        let name = String(content[nameRange])
+                        
+                        // Additional validation - avoid common words that aren't names
+                        if isLikelyUserName(name) {
+                            mentions.append("@\(name.lowercased())")
+                        }
+                    }
                 }
             }
         }
         
         return mentions
+    }
+    
+    /// Check if a word is likely to be a user name vs a common word
+    private static func isLikelyUserName(_ word: String) -> Bool {
+        // Exclude common words that might be capitalized but aren't names
+        let excludedWords = [
+            "Today", "Yesterday", "Tomorrow", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+            "January", "February", "March", "April", "June", "July", "August", "September", "October", "November", "December",
+            "Please", "Thanks", "Welcome", "Hello", "Great", "Nice", "Good", "Best", "Here", "There", "This", "That",
+            "Team", "Everyone", "Someone", "Anyone", "Project", "Meeting", "Update", "Report", "File", "Document",
+            "System", "Server", "Database", "Website", "Application", "Software", "Hardware", "Network"
+        ]
+        
+        return !excludedWords.contains(word) && 
+               word.count >= 3 && 
+               word.count <= 15 &&
+               word.first?.isUppercase == true
     }
     
     /// Extract channel references from message content

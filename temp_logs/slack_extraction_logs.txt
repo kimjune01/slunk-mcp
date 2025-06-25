@@ -1,0 +1,416 @@
+Filtering the log data using "process == "slunk-swift""
+Timestamp                       (process)[PID]    
+2025-06-25 13:45:30.284717-0700  localhost slunk-swift[10460]: (libsystem_info.dylib) Created Activity ID: 0x282bfd0, Description: Retrieve User by ID
+2025-06-25 13:45:30.324240-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003afc000] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon
+2025-06-25 13:45:30.324319-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003afc0f0] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.agent
+2025-06-25 13:45:30.338855-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Default] Adding observer for DDS asset update notification for asset type: (com.apple.MobileAsset.LinguisticData)
+2025-06-25 13:45:30.338906-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Default] Adding observer for DDS asset update notification for asset type: (com.apple.MobileAsset.LinguisticDataAuto)
+2025-06-25 13:45:30.340096-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:AutoAsset] Auto asset is not supported for query: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>>
+2025-06-25 13:45:30.340150-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] Updated cache for query: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> assets: (
+) was cached: 0, cachedOnly: 0
+2025-06-25 13:45:30.340175-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 0, cachedOnly: 0
+2025-06-25 13:45:30.340268-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Default] Supported compatibility version = 16 in file: Info.plist
+2025-06-25 13:45:30.340279-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Default] Supported compatibility version for LinguisticData assets = 16
+2025-06-25 13:45:30.340317-0700  localhost slunk-swift[10460]: (libMobileGestalt.dylib) No persisted cache on this platform.
+2025-06-25 13:45:30.340628-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x13b206ac0] activating connection: mach=true listener=false peer=false name=com.apple.mobileassetd.v2
+2025-06-25 13:45:30.383310-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 0, cachedOnly: 0
+2025-06-25 13:45:30.383419-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:AutoAsset] Auto asset is not supported for query: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>>
+2025-06-25 13:45:30.383441-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] Updated cache for query: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> assets: (
+) was cached: 0, cachedOnly: 0
+2025-06-25 13:45:30.383457-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 0, cachedOnly: 0
+2025-06-25 13:45:30.425455-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 0, cachedOnly: 0
+2025-06-25 13:45:30.425728-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.425751-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.425785-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.425804-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.425966-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.425985-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.426015-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.426036-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436110-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436134-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436162-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436180-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436304-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436322-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436344-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436360-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436484-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436502-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436522-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.436537-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.437403-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003af0000] activating connection: mach=true listener=false peer=false name=com.apple.coreservices.launchservicesd
+2025-06-25 13:45:30.437919-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003af80f0] activating connection: mach=true listener=false peer=false name=com.apple.analyticsd
+2025-06-25 13:45:30.438267-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003af00f0] activating connection: mach=true listener=false peer=false name=com.apple.pasteboard.1
+2025-06-25 13:45:30.438769-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003af01e0] activating connection: mach=true listener=false peer=false name=com.apple.distributed_notifications@Uv3
+2025-06-25 13:45:30.440590-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:AutomaticTermination] void _NSDisableAutomaticTerminationAndLog(NSString *) No windows open yet
+2025-06-25 13:45:30.441075-0700  localhost slunk-swift[10460]: (TCC) Created Activity ID: 0x282bfd1, Description: TCCAccessRequest() IPC
+2025-06-25 13:45:30.441123-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003ae4000] activating connection: mach=true listener=false peer=false name=com.apple.tccd.system
+2025-06-25 13:45:30.444415-0700  localhost slunk-swift[10460]: (CoreAnalytics) [com.apple.CoreAnalytics:client] Received configuration update from daemon (initial)
+2025-06-25 13:45:30.445916-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003ae4000] invalidated after the last release of the connection object
+2025-06-25 13:45:30.446147-0700  localhost slunk-swift[10460]: (SkyLight) [com.apple.SkyLight:default] server port 0x00005307, session port 0x00005307
+2025-06-25 13:45:30.458958-0700  localhost slunk-swift[10460]: (SkyLight) [com.apple.SkyLight:default] New connection 0xbe627 main
+2025-06-25 13:45:30.463638-0700  localhost slunk-swift[10460]: (LaunchServices) [com.apple.processmanager:front-35286506] CHECKIN: pid=10460
+2025-06-25 13:45:30.477020-0700  localhost slunk-swift[10460]: (LaunchServices) [com.apple.processmanager:front-35286506] CHECKEDIN: pid=10460 asn=0x0-0x7a26a1f foreground=1
+2025-06-25 13:45:30.477284-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129e04bf0] activating connection: mach=false listener=true peer=false name=(anonymous)
+2025-06-25 13:45:30.477299-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129e04bf0] Channel could not return listener port.
+2025-06-25 13:45:30.477363-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x13b104560] activating connection: mach=false listener=false peer=true name=com.apple.xpc.anonymous.0x129e04bf0.peer[552].0x13b104560
+2025-06-25 13:45:30.477911-0700  localhost slunk-swift[10460]: (HIServices) [com.apple.processmanager:front-35286506] FRONTLOGGING: version 1
+2025-06-25 13:45:30.477922-0700  localhost slunk-swift[10460]: (HIServices) [com.apple.processmanager:front-35286506] Registered, pid=10460 ASN=0x0,0x7a26a1f
+2025-06-25 13:45:30.478687-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129e04bf0] Channel could not return listener port.
+2025-06-25 13:45:30.478833-0700  localhost slunk-swift[10460]: (HIServices) [com.apple.processmanager:front-35286506] BringForward: pid=10460 asn=0x0-0x7a26a1f bringForward=1 foreground=1 uiElement=0 launchedByLS=1 modifiersCount=1 allDisabled=0
+2025-06-25 13:45:30.478850-0700  localhost slunk-swift[10460]: (HIServices) [com.apple.processmanager:front-35286506] BringFrontModifier: pid=10460 asn=0x0-0x7a26a1f Modifier 0 hideAfter=0 hideOthers=0 dontMakeFrontmost=1 mouseDown=0/0 seed=0/0
+2025-06-25 13:45:30.478915-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x13b105770] activating connection: mach=true listener=false peer=false name=com.apple.lsd.mapdb
+2025-06-25 13:45:30.479179-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:Appearance] Current system appearance, (HLTB: 2), (SLS: 1)
+2025-06-25 13:45:30.480851-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:Appearance] Current system appearance, (HLTB: 2), (SLS: 1)
+2025-06-25 13:45:30.481481-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:Appearance] Post-registration system appearance: (HLTB: 2)
+2025-06-25 13:45:30.483495-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129e04bf0] Channel could not return listener port.
+2025-06-25 13:45:30.487335-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129e04bf0] Channel could not return listener port.
+2025-06-25 13:45:30.492973-0700  localhost slunk-swift[10460]: (CoreFoundation) Created Activity ID: 0x282bfd2, Description: Loading Preferences From User CFPrefsD
+2025-06-25 13:45:30.504710-0700  localhost slunk-swift[10460]: (XCTTargetBootstrap) [com.apple.dt.xctest:Default] Registering for test daemon availability notify post.
+2025-06-25 13:45:30.504825-0700  localhost slunk-swift[10460]: (XCTTargetBootstrap) [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2025-06-25 13:45:30.504925-0700  localhost slunk-swift[10460]: (XCTTargetBootstrap) [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2025-06-25 13:45:30.504995-0700  localhost slunk-swift[10460]: (XCTTargetBootstrap) [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2025-06-25 13:45:30.623650-0700  localhost slunk-swift[10460]: (GenerativeModels) [com.apple.GenerativeModels:availability] registering darwin observer for name: com.apple.gms.availability.notification
+2025-06-25 13:45:30.623688-0700  localhost slunk-swift[10460]: (GenerativeModels) [com.apple.GenerativeModels:availability] registering darwin observer for name: com.apple.os-eligibility-domain.change.greymatter
+2025-06-25 13:45:30.623709-0700  localhost slunk-swift[10460]: (GenerativeModels) [com.apple.GenerativeModels:availability] registering darwin observer for name: com.apple.language.changed
+2025-06-25 13:45:30.623734-0700  localhost slunk-swift[10460]: (WritingToolsUI) [com.apple.WritingTools:Default] isAvailable value changed: featureEnabled = true, isMDMAllowed = true, gmAvailable (current) = true
+2025-06-25 13:45:30.624619-0700  localhost slunk-swift[10460]: (CoreFoundation) Created Activity ID: 0x282bfd3, Description: Loading Preferences From User CFPrefsD
+2025-06-25 13:45:30.626689-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129f05ee0] activating connection: mach=true listener=false peer=false name=com.apple.appkit.restoration_storage
+2025-06-25 13:45:30.627004-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003ae4000] activating connection: mach=true listener=false peer=false name=com.apple.coreservices.appleevents
+2025-06-25 13:45:30.627327-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129e04bf0] Channel could not return listener port.
+2025-06-25 13:45:30.627524-0700  localhost slunk-swift[10460]: (HIServices) [com.apple.processmanager:front-35286506] SignalReady: pid=10460 asn=0x0-0x7a26a1f
+2025-06-25 13:45:30.627724-0700  localhost slunk-swift[10460]: (LaunchServices) [com.apple.processmanager:front-35286506] SIGNAL: pid=10460 asn=0x0x-0x7a26a1f
+2025-06-25 13:45:30.628786-0700  localhost slunk-swift[10460]: (CoreFoundation) Created Activity ID: 0x282bfd4, Description: Loading Preferences From System CFPrefsD
+2025-06-25 13:45:30.629808-0700  localhost slunk-swift[10460]: (libsystem_info.dylib) Created Activity ID: 0x282bfd5, Description: Membership API: translate identifier
+2025-06-25 13:45:30.633591-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:AutomaticTermination] void _NSDisableAutomaticTerminationAndLog(NSString *) Restoring windows
+2025-06-25 13:45:30.634006-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:StateRestoration] -[NSApplication _reopenWindowsAsNecessaryIncludingRestorableState:withFullFidelity:completionHandler:] shouldRestoreState=1 hasPersistentStateToRestore=1 shouldStillRestoreStateAfterPrompting=1
+2025-06-25 13:45:30.635528-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:StateRestoration] -[NSApplication(NSPersistentUIRestorationSupport) _restoreWindowWithRestoration:completionHandler:] restoration=<NSPersistentUIWindowRestoration: 0x6000026d4960> savedIdentifier=SwiftUI.ModifiedContent<slunk_swift.ContentView, SwiftUI._AppearanceActionModifier>-1-AppWindow-1
+2025-06-25 13:45:30.635545-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:StateRestoration] -[NSApplication(NSWindowRestoration) restoreWindowWithIdentifier:state:completionHandler:] identifier=SwiftUI.ModifiedContent<slunk_swift.ContentView, SwiftUI._AppearanceActionModifier>-1-AppWindow-1 className=SwiftUI.AppWindowsController
+2025-06-25 13:45:30.635560-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:StateRestoration] -[NSApplication(NSWindowRestoration) restoreWindowWithIdentifier:state:completionHandler:] restorerIsValid=YES restorer=SwiftUI.AppWindowsController
+2025-06-25 13:45:30.638825-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:Appearance] NSApp cache appearance:
+-NSRequiresAquaSystemAppearance: 0
+-appearance: (null)
+-effectiveAppearance: <NSCompositeAppearance: 0x6000037e01b0
+ (
+    "<NSDarkAquaAppearance: 0x6000037e0090>",
+    "<NSSystemAppearance: 0x6000037fc3f0>"
+)>
+2025-06-25 13:45:30.640447-0700  localhost slunk-swift[10460]: (CoreFoundation) Created Activity ID: 0x282bfd6, Description: Loading Preferences From User CFPrefsD
+2025-06-25 13:45:30.640750-0700  localhost slunk-swift[10460]: (CoreFoundation) Created Activity ID: 0x282bfd7, Description: Loading Preferences From User CFPrefsD
+2025-06-25 13:45:30.642192-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x6000039f8900] activating connection: mach=true listener=false peer=false name=com.apple.fonts
+2025-06-25 13:45:30.662311-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129e18620] activating connection: mach=true listener=false peer=false name=com.apple.windowmanager.server
+2025-06-25 13:45:30.676628-0700  localhost slunk-swift[10460]: (Metal) Metal API Validation Enabled
+2025-06-25 13:45:30.699327-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003af85a0] activating connection: mach=true listener=false peer=false name=com.apple.dock.fullscreen
+2025-06-25 13:45:30.699500-0700  localhost slunk-swift[10460]: (CoreFoundation) Created Activity ID: 0x282bfd8, Description: Loading Preferences From User CFPrefsD
+2025-06-25 13:45:30.706008-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706042-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706079-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706101-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706262-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706281-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706306-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706326-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706473-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706492-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706516-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.706534-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707183-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707205-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707230-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707250-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707379-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707399-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707424-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707443-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707591-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707610-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Delta\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707634-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticDataAuto, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.707653-0700  localhost slunk-swift[10460]: (DataDeliveryServices) [com.apple.DataDeliveryServices:Query] assetsForQuery: <query: com.apple.MobileAsset.LinguisticData, locO: 1, iO: 1, latO: 1, cO: 0, <filter: {
+    AssetLocale = "{(\n    en\n)}";
+    LinguisticAssetType = "{(\n    Optional\n)}";
+}>> final result: (
+    "en-Optional::49cba5b263df0ee258d8cf314fcd882ba7a39d71.asset"
+) was cached: 1, cachedOnly: 0
+2025-06-25 13:45:30.747068-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:StateRestoration] -[NSApplication(NSPersistentUIRestorationSupport) _restoreWindowWithRestoration:completionHandler:]_block_invoke restoration=<NSPersistentUIWindowRestoration: 0x6000026d4960> window=0x13c071e00 savedIdentifier=SwiftUI.ModifiedContent<slunk_swift.ContentView, SwiftUI._AppearanceActionModifier>-1-AppWindow-1 error=(null)
+2025-06-25 13:45:30.773876-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:AutomaticTermination] void _NSEnableAutomaticTerminationAndLog(NSString *) No windows open yet
+2025-06-25 13:45:30.774275-0700  localhost slunk-swift[10460]: (UIIntelligenceSupport) [com.apple.UIIntelligenceSupport:xpc] establishing connection to agent
+2025-06-25 13:45:30.774313-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:session] [0x6000026e6ee0] Session created.
+2025-06-25 13:45:30.774321-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:session] [0x6000026e6ee0] Session created from connection [0x600003afc870]
+2025-06-25 13:45:30.774337-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003afc870] activating connection: mach=true listener=false peer=false name=com.apple.uiintelligencesupport.agent
+2025-06-25 13:45:30.774419-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:session] [0x6000026e6ee0] Session activated
+2025-06-25 13:45:30.777117-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:Window] order window front conditionally: 12397 related: 0
+2025-06-25 13:45:30.781645-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:AutomaticTermination] void _NSEnableAutomaticTerminationAndLog(NSString *) Restoring windows
+2025-06-25 13:45:30.800102-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:Window] order window front conditionally: 12397 related: 0
+2025-06-25 13:45:30.812051-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003ae45a0] activating connection: mach=true listener=false peer=false name=com.apple.window_proxies
+2025-06-25 13:45:30.812131-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003ae45a0] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2025-06-25 13:45:30.813303-0700  localhost slunk-swift[10460]: (RunningBoardServices) [com.apple.runningboard:connection] Initializing connection
+2025-06-25 13:45:30.813343-0700  localhost slunk-swift[10460]: (RunningBoardServices) [com.apple.runningboard:process] Removing all cached process handles
+2025-06-25 13:45:30.813363-0700  localhost slunk-swift[10460]: (RunningBoardServices) [com.apple.runningboard:connection] Sending handshake request attempt #1 to server
+2025-06-25 13:45:30.813377-0700  localhost slunk-swift[10460]: (RunningBoardServices) [com.apple.runningboard:connection] Creating connection to com.apple.runningboard
+2025-06-25 13:45:30.813386-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003afd3b0] activating connection: mach=true listener=false peer=false name=com.apple.runningboard
+2025-06-25 13:45:30.813718-0700  localhost slunk-swift[10460]: (RunningBoardServices) Created Activity ID: 0x282bfdb, Description: didChangeInheritances
+2025-06-25 13:45:30.813899-0700  localhost slunk-swift[10460]: (RunningBoardServices) [com.apple.runningboard:connection] Handshake succeeded
+2025-06-25 13:45:30.813917-0700  localhost slunk-swift[10460]: (RunningBoardServices) [com.apple.runningboard:connection] Identity resolved as app<application.kim.june.slunk-swift.77214567.77216389.AEACE091-C025-45F7-89FC-ABC34B1FA15F(501)>
+2025-06-25 13:45:30.814742-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003ae45a0] activating connection: mach=false listener=false peer=false name=com.apple.ViewBridgeAuxiliary
+2025-06-25 13:45:30.815411-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129f21840] activating connection: mach=false listener=false peer=false name=(anonymous)
+2025-06-25 13:45:30.815585-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129f10680] activating connection: mach=false listener=true peer=false name=(anonymous)
+2025-06-25 13:45:30.815596-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x129f10680] Channel could not return listener port.
+2025-06-25 13:45:30.815863-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003ae45a0] invalidated after the last release of the connection object
+2025-06-25 13:45:30.816002-0700  localhost slunk-swift[10460]: (CoreFoundation) Created Activity ID: 0x282bfdc, Description: Updating Key-Value Observers Of Preferences
+2025-06-25 13:45:30.834062-0700  localhost slunk-swift[10460]: (RunningBoardServices) Created Activity ID: 0x282bfde, Description: didChangeInheritances
+2025-06-25 13:45:30.887870-0700  localhost slunk-swift[10460]: (LaunchServices) [com.apple.launchservices:db] NotifyToken::RegisterDispatch(user.uid.501.com.apple.LaunchServices.database) fired for session key LSSessionKey(system: 0 uid: 501)
+2025-06-25 13:45:31.047211-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003aec000] activating connection: mach=false listener=false peer=false name=com.apple.hiservices-xpcservice
+2025-06-25 13:45:31.052294-0700  localhost slunk-swift[10460]: (HIToolbox) [com.apple.inputmethodkitClient:Client] +[IMKClient subclass]: chose IMKClient_Modern
+2025-06-25 13:45:31.052339-0700  localhost slunk-swift[10460]: (HIToolbox) [com.apple.inputmethodkitClient:Client] +[IMKInputSession subclass]: chose IMKInputSession_Modern
+2025-06-25 13:45:31.056246-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x139e04b50] activating connection: mach=true listener=false peer=false name=com.apple.inputmethodkit.getxpcendpoint
+2025-06-25 13:45:31.057936-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x139e04d60] activating connection: mach=false listener=false peer=false name=(anonymous)
+2025-06-25 13:45:32.528632-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:Window] order all windows front 1416423441353458
+2025-06-25 13:45:33.519484-0700  localhost slunk-swift[10460]: (CoreFoundation) Created Activity ID: 0x282c0d2, Description: Loading Preferences From User CFPrefsD
+2025-06-25 13:45:33.520194-0700  localhost slunk-swift[10460]: (AppKit) Created Activity ID: 0x282c0d3, Description: trackMouse send control actions
+2025-06-25 13:45:33.526865-0700  localhost slunk-swift[10460]: (AppKit) Created Activity ID: 0x282c0d4, Description: trackMouse send control actions
+2025-06-25 13:45:33.606154-0700  localhost slunk-swift[10460]: (AppKit) Created Activity ID: 0x282c0d5, Description: trackMouse send action on mouseUp
+2025-06-25 13:45:33.606245-0700  localhost slunk-swift[10460]: (AppKit) Created Activity ID: 0x282c0d6, Description: sendActionFrom:
+2025-06-25 13:45:33.606303-0700  localhost slunk-swift[10460]: (AppKit) Created Activity ID: 0x282c0d7, Description: trackMouse send control actions
+2025-06-25 13:45:33.606814-0700  localhost slunk-swift[10460]: (AppKit) Created Activity ID: 0x282c0d8, Description: sendAction:
+2025-06-25 13:45:33.626184-0700  localhost slunk-swift[10460]: (TCC) Created Activity ID: 0x282c0d9, Description: TCCAccessRequest() IPC
+2025-06-25 13:45:33.626249-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003af8690] activating connection: mach=true listener=false peer=false name=com.apple.tccd.system
+2025-06-25 13:45:33.632350-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003af8690] invalidated after the last release of the connection object
+2025-06-25 13:45:33.987336-0700  localhost slunk-swift[10460]: (IOKit) [com.apple.iohid:oversized] Released connection: AEA9224A-C268-4B82-B712-933F80121420
+{
+    UUID = "AEA9224A-C268-4B82-B712-933F80121420";
+    caller = "HIToolbox: _TISCopyAttachedKeyboardLanguages + 112";
+    dispatchQueue = 0;
+    eventCount = 0;
+    eventMask = 0;
+    port = 82179;
+    resetCount = 0;
+    runloop = 0;
+    services =     (
+        4297717481,
+        4295887617
+    );
+    virtualServices =     (
+    );
+}
+2025-06-25 13:45:34.766142-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:AutomaticTermination] void _updateToReflectAutomaticTerminationState(void) Setting _kLSApplicationWouldBeTerminatedByTALKey=0
+2025-06-25 13:45:34.851424-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:StateRestoration] -[NSPersistentUIManager flushAllChanges]
+2025-06-25 13:45:34.851513-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:StateRestoration] -[NSPersistentUIManager flushAllChanges] Emptying for initial flush.
+2025-06-25 13:45:34.862666-0700  localhost slunk-swift[10460]: (RunningBoardServices) Created Activity ID: 0x282c0db, Description: didChangeInheritances
+2025-06-25 13:45:34.863282-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:StateRestoration] -[NSPersistentUIManager flushAllChanges] finishing enqueued operations
+2025-06-25 13:45:34.863328-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:StateRestoration] -[NSPersistentUIManager flushAllChanges]_block_invoke asyncing to main queue
+2025-06-25 13:45:34.868591-0700  localhost slunk-swift[10460]: (AppKit) [com.apple.AppKit:StateRestoration] -[NSPersistentUIManager flushAllChanges]_block_invoke writing records
+2025-06-25 13:45:35.775233-0700  localhost slunk-swift[10460]: (TCC) Created Activity ID: 0x282c0dc, Description: TCCAccessRequest() IPC
+2025-06-25 13:45:35.775356-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003ae0000] activating connection: mach=true listener=false peer=false name=com.apple.tccd.system
+2025-06-25 13:45:35.787843-0700  localhost slunk-swift[10460]: (libxpc.dylib) [com.apple.xpc:connection] [0x600003ae0000] invalidated after the last release of the connection object

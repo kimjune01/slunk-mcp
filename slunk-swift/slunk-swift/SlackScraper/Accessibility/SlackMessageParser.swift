@@ -10,8 +10,6 @@ actor SlackMessageParser {
     
     /// Parse messages from content list using LBAccessibility
     func parseMessagesFromContentList(_ contentList: Element) async throws -> [SlackMessage] {
-        print("🔍 SlackMessageParser: Parsing messages from content list...")
-        
         // Check if this is a thread sidebar for processing context
         let _ = (try? contentList.getAttributeValue(.description) as? String)?.contains("Thread") ?? false
         
@@ -20,8 +18,6 @@ actor SlackMessageParser {
             print("❌ SlackMessageParser: No children found in content list")
             return []
         }
-        
-        print("🔍 SlackMessageParser: Found \(children.count) child elements")
         
         var messages: [SlackMessage] = []
         
@@ -96,7 +92,6 @@ actor SlackMessageParser {
                            !s.lowercased().contains("replies") &&
                            !s.isEmpty {
                             sender = s
-                            print("   ✅ Found sender from button: '\(s)'")
                         }
                     } else if role == .link {
                         // Could be sender or timestamp
@@ -109,7 +104,6 @@ actor SlackMessageParser {
                         } else if sender == nil && !linkText.isEmpty {
                             // Might be the sender name as a link
                             sender = linkText
-                            print("   ✅ Found sender from link: '\(sender ?? "")'")
                         }
                     } else if role == .staticText && sender == nil {
                         // Sometimes sender is just static text
@@ -117,7 +111,6 @@ actor SlackMessageParser {
                             // Check if this looks like a username
                             if !text.contains(":") && text.count < 50 {
                                 sender = text
-                                print("   ✅ Found sender from static text: '\(sender ?? "")'")
                             }
                         }
                     }
@@ -127,8 +120,6 @@ actor SlackMessageParser {
         
         // If still no sender, look deeper in the tree
         if sender == nil {
-            print("   🔍 No sender found in direct children, searching deeper...")
-            
             // Look for any element with a reasonable username
             let usernameMatcher = Matchers.any([
                 Matchers.hasRole(.button),
@@ -147,9 +138,7 @@ actor SlackMessageParser {
                 if sender == nil {
                     sender = try? senderElement.getAttributeValue(.title) as? String
                 }
-                if let s = sender {
-                    print("   ✅ Found sender via deep search: '\(s)'")
-                }
+                // Sender found via deep search
             }
         }
         
@@ -160,23 +149,47 @@ actor SlackMessageParser {
         // If we have content but no sender, use a placeholder
         if let content = content, !content.isEmpty, sender == nil {
             sender = "Unknown User"
-            print("   ⚠️ Using placeholder sender for message with content")
         }
         
         guard let content = content, !content.isEmpty,
               let sender = sender else {
-            print("❌ SlackMessageParser: Missing required message data (content: \(content?.isEmpty ?? true), sender: \(sender == nil))")
             return nil
         }
         
-        print("✅ SlackMessageParser: Extracted message from \(sender): \(String(content.prefix(50)))")
+        // Extract additional metadata
+        let mentions = SlackParsingHelpers.extractMentions(from: content)
+        let reactions = try await extractReactions(from: mainGroup)
+        let attachmentNames = try await extractAttachmentNames(from: mainGroup)
+        let threadId = contentResult.threadId
         
-        return SlackMessage(
+        // Create content hash for deduplication
+        let contentHash = SlackMessage.generateContentHash(
+            content: content,
+            sender: sender,
+            timestamp: timestamp ?? Date()
+        )
+        
+        // Create metadata
+        let metadata = SlackMessage.MessageMetadata(
+            reactions: reactions.isEmpty ? nil : reactions,
+            mentions: mentions.isEmpty ? nil : mentions,
+            attachmentNames: attachmentNames.isEmpty ? nil : attachmentNames,
+            contentHash: contentHash
+        )
+        
+        let finalMessage = SlackMessage(
             timestamp: timestamp ?? Date(),
             sender: sender,
             content: content,
-            messageType: .regular
+            threadId: threadId,
+            messageType: contentResult.isThread ? .thread : .regular,
+            metadata: metadata
         )
+        
+        // Log successful message extraction
+        print("✅ Extracted message from \(finalMessage.sender)")
+        
+        return finalMessage
     }
     
     /// Extract text content from element using LBAccessibility tree traversal
@@ -199,6 +212,7 @@ actor SlackMessageParser {
         let content: String?
         let isThread: Bool
         let threadInfo: [String]
+        let threadId: String?
     }
     
     /// Extract message content with thread detection
@@ -221,10 +235,14 @@ actor SlackMessageParser {
             finalContent = mainContent
         }
         
+        // Generate thread ID if this is a thread message
+        let threadId = !threadInfo.isEmpty ? "thread_\(Date().timeIntervalSince1970)" : nil
+        
         return ContentResult(
             content: finalContent.isEmpty ? nil : finalContent,
             isThread: !threadInfo.isEmpty,
-            threadInfo: threadInfo
+            threadInfo: threadInfo,
+            threadId: threadId
         )
     }
     
@@ -292,6 +310,269 @@ actor SlackMessageParser {
                 }
             }
         }
+    }
+    
+    // MARK: - Enhanced Extraction Methods
+    
+    /// Extract emoji reactions from message element
+    func extractReactions(from element: Element) async throws -> [String: Int] {
+        var reactions: [String: Int] = [:]
+        
+        // Look for reaction elements in the message
+        let reactionMatcher = Matchers.any([
+            Matchers.hasClassContaining("reaction"),
+            Matchers.hasClassContaining("emoji"),
+            Matchers.all([
+                Matchers.hasRole(.button),
+                Matchers.hasAttribute(.description, substring: "reaction")
+            ])
+        ])
+        
+        do {
+            let reactionElements = try await element.findElements(
+                matching: reactionMatcher,
+                maxDepth: 8,
+                deadline: Deadline.fromNow(duration: 2.0)
+            )
+            
+            for reactionElement in reactionElements {
+                if let reactionData = try await parseReactionElement(reactionElement as! Element) {
+                    reactions[reactionData.emoji] = reactionData.count
+                }
+            }
+        } catch {
+            print("⚠️ Failed to extract reactions: \(error)")
+        }
+        
+        return reactions
+    }
+    
+    /// Parse individual reaction element
+    private func parseReactionElement(_ element: Element) async throws -> (emoji: String, count: Int)? {
+        // Try to get reaction info from title, value, or description
+        let title = element.getSafeTitle() ?? ""
+        let value = element.getSafeStringValue() ?? ""
+        let description = element.getSafeDescription() ?? ""
+        
+        let combinedText = "\(title) \(value) \(description)"
+        
+        // Updated patterns for Slack's actual format
+        let patterns = [
+            // Pattern 1: "2 reactions, react with excited emoji" -> excited = 2
+            #"(\d+)\s+reactions?,\s+react\s+with\s+(\w+)\s+emoji"#,
+            
+            // Pattern 2: "excited emoji" (assume count = 1 if no number found)
+            #"^(\w+)\s+emoji$"#,
+            
+            // Pattern 3: Direct emoji with count "👍 3"
+            #"([\p{Emoji_Presentation}\p{Emoji}\uFE0F])\s*(\d+)"#,
+            
+            // Pattern 4: "thumbs up, 2 reactions" 
+            #"(\w+)\s*(?:up|down|hand|face|heart)?\s*,\s*(\d+)\s*reactions?"#,
+            
+            // Pattern 5: Just the emoji name with assumed count 1
+            #"^(\w+)$"#
+        ]
+        
+        for (index, pattern) in patterns.enumerated() {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+               let match = regex.firstMatch(in: combinedText, range: NSRange(combinedText.startIndex..., in: combinedText)) {
+                
+                if index == 0 {
+                    // Pattern 1: count first, then emoji name
+                    if let countRange = Range(match.range(at: 1), in: combinedText),
+                       let emojiRange = Range(match.range(at: 2), in: combinedText),
+                       let count = Int(String(combinedText[countRange])) {
+                        let emoji = String(combinedText[emojiRange])
+                        return (emoji: emoji, count: count)
+                    }
+                } else if index == 1 || index == 4 {
+                    // Pattern 2 & 5: emoji name only, assume count = 1
+                    if let emojiRange = Range(match.range(at: 1), in: combinedText) {
+                        let emoji = String(combinedText[emojiRange])
+                        return (emoji: emoji, count: 1)
+                    }
+                } else if index == 2 {
+                    // Pattern 3: emoji first, then count
+                    if let emojiRange = Range(match.range(at: 1), in: combinedText),
+                       let countRange = Range(match.range(at: 2), in: combinedText),
+                       let count = Int(String(combinedText[countRange])) {
+                        let emoji = String(combinedText[emojiRange])
+                        return (emoji: emoji, count: count)
+                    }
+                } else if index == 3 {
+                    // Pattern 4: emoji name first, then count
+                    if let emojiRange = Range(match.range(at: 1), in: combinedText),
+                       let countRange = Range(match.range(at: 2), in: combinedText),
+                       let count = Int(String(combinedText[countRange])) {
+                        let emoji = String(combinedText[emojiRange])
+                        return (emoji: emoji, count: count)
+                    }
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Extract attachment file names from message element
+    func extractAttachmentNames(from element: Element) async throws -> [String] {
+        var attachmentNames: [String] = []
+        
+        // Look for attachment elements
+        let attachmentMatcher = Matchers.any([
+            Matchers.hasClassContaining("attachment"),
+            Matchers.hasClassContaining("file"),
+            Matchers.hasClassContaining("upload"),
+            Matchers.hasAttribute(.description, substring: "uploaded"),
+            Matchers.hasAttribute(.description, substring: "file"),
+            Matchers.hasAttribute(.title, substring: ".pdf"),
+            Matchers.hasAttribute(.title, substring: ".jpg"),
+            Matchers.hasAttribute(.title, substring: ".png"),
+            Matchers.hasAttribute(.title, substring: ".doc")
+        ])
+        
+        do {
+            let attachmentElements = try await element.findElements(
+                matching: attachmentMatcher,
+                maxDepth: 8,
+                deadline: Deadline.fromNow(duration: 2.0)
+            )
+            
+            for attachmentElement in attachmentElements {
+                if let fileName = try await parseAttachmentElement(attachmentElement as! Element) {
+                    attachmentNames.append(fileName)
+                }
+            }
+        } catch {
+            print("⚠️ Failed to extract attachments: \(error)")
+        }
+        
+        // Also look for file patterns in the text content
+        let content = try await extractMessageContent(from: element) ?? ""
+        let filePatterns = extractFileNamesFromText(content)
+        attachmentNames.append(contentsOf: filePatterns)
+        
+        let finalAttachments = Array(Set(attachmentNames)) // Remove duplicates
+        return finalAttachments
+    }
+    
+    /// Parse individual attachment element
+    private func parseAttachmentElement(_ element: Element) async throws -> String? {
+        let title = element.getSafeTitle() ?? ""
+        let value = element.getSafeStringValue() ?? ""
+        let description = element.getSafeDescription() ?? ""
+        
+        let combinedText = "\(title) \(value) \(description)"
+        
+        // Enhanced patterns for Slack's attachment formats
+        let patterns = [
+            // Pattern 1: Traditional file attachments
+            #"([\w\-\.]+\.[a-zA-Z]{2,5})"#,  // filename.ext
+            #"uploaded\s+([\w\-\.]+)"#,        // uploaded filename
+            #"file\s+([\w\-\.]+)"#,           // file filename
+            
+            // Pattern 2: URL/Link patterns (from logs: "in.linkedin.com")
+            #"([a-zA-Z0-9\-]+\.[a-zA-Z]{2,10}(?:\.[a-zA-Z]{2,5})?)"#,  // domain.com or subdomain.domain.com
+            
+            // Pattern 3: Link title extraction (from logs: "Rohan Bhagwat - Boomerang | LinkedIn")
+            #"^([^|]+)\s*\|\s*LinkedIn"#,        // "Name - Title | LinkedIn"
+            #"^([^(]+)\s*\(opens in new tab\)"#, // "Title (opens in new tab)"
+            
+            // Pattern 4: Clean link text patterns
+            #"^([A-Za-z0-9\s\-]+)(?:\s*-\s*[A-Za-z\s]+)?$"#  // Clean readable titles
+        ]
+        
+        for (index, pattern) in patterns.enumerated() {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+                let matches = regex.matches(in: combinedText, range: NSRange(combinedText.startIndex..., in: combinedText))
+                for match in matches {
+                    if let fileRange = Range(match.range(at: 1), in: combinedText) {
+                        let fileName = String(combinedText[fileRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                        
+                        if isValidAttachmentName(fileName) {
+                            return fileName
+                        }
+                    }
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Extract file names from text content using pattern matching
+    private func extractFileNamesFromText(_ text: String) -> [String] {
+        let filePattern = #"([\w\-\.]+\.(pdf|doc|docx|xls|xlsx|ppt|pptx|jpg|jpeg|png|gif|zip|txt|csv))"#
+        
+        guard let regex = try? NSRegularExpression(pattern: filePattern, options: [.caseInsensitive]) else {
+            return []
+        }
+        
+        let matches = regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+        var fileNames: [String] = []
+        
+        for match in matches {
+            if let fileRange = Range(match.range(at: 1), in: text) {
+                fileNames.append(String(text[fileRange]))
+            }
+        }
+        
+        return fileNames
+    }
+    
+    /// Validate if a string looks like a valid file name
+    private func isValidFileName(_ fileName: String) -> Bool {
+        // Check if it has a reasonable extension
+        let validExtensions = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", 
+                               "jpg", "jpeg", "png", "gif", "zip", "txt", "csv", "mp4", "mov"]
+        
+        let lowercased = fileName.lowercased()
+        let hasValidExtension = validExtensions.contains { lowercased.hasSuffix($0) }
+        
+        // Check reasonable length and no suspicious patterns
+        return hasValidExtension && 
+               fileName.count > 3 && 
+               fileName.count < 100 &&
+               !fileName.contains("\n") &&
+               !fileName.contains("  ")
+    }
+    
+    /// Validate if a string looks like a valid attachment name (including URLs and links)
+    private func isValidAttachmentName(_ name: String) -> Bool {
+        // Skip empty, very short, or very long names
+        guard name.count >= 3 && name.count <= 200 && !name.contains("\n") else {
+            return false
+        }
+        
+        // Valid file extensions
+        let validExtensions = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", 
+                               "jpg", "jpeg", "png", "gif", "zip", "txt", "csv", "mp4", "mov"]
+        
+        let lowercased = name.lowercased()
+        
+        // Check 1: Traditional file with extension
+        if validExtensions.contains(where: { lowercased.hasSuffix($0) }) {
+            return true
+        }
+        
+        // Check 2: Domain/URL patterns
+        if name.contains(".com") || name.contains(".org") || name.contains(".net") || 
+           name.contains(".io") || name.contains(".ai") || name.contains(".co") {
+            return true
+        }
+        
+        // Check 3: Meaningful link titles (exclude generic text)
+        let exclusions = ["reactions", "add reaction", "reply", "thread", "edited", "delete", "more actions"]
+        if exclusions.contains(where: { lowercased.contains($0) }) {
+            return false
+        }
+        
+        // Check 4: Has meaningful content (contains letters and reasonable length)
+        let hasLetters = name.rangeOfCharacter(from: .letters) != nil
+        let hasReasonableLength = name.count >= 5
+        
+        return hasLetters && hasReasonableLength
     }
     
     // MARK: - Helper Methods
