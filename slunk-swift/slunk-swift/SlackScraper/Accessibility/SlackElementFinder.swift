@@ -114,4 +114,49 @@ actor SlackElementFinder {
             deadline: Deadline.fromNow(duration: 1.0)
         ) as? Element
     }
+    
+    // MARK: - Thread DOM Identifier Matching
+    
+    /// Find element with DOM identifier starting with specified prefix
+    /// Based on reference SlackParser.swift:133,137
+    func findElementWithDOMIdentifierPrefix(
+        from element: Element,
+        prefix: String
+    ) async throws -> Element? {
+        
+        // Get all children to check their DOM identifiers
+        guard let children = try element.getChildren() else {
+            return nil
+        }
+        
+        for child in children {
+            if let childElement = child as? Element {
+                if let domId = try? childElement.getAttributeValue(.domIdentifier) as? String {
+                    if domId.starts(with: prefix) {
+                        return childElement
+                    }
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Find thread view header element
+    /// Based on reference SlackParser.swift:137 - domId.starts(with: "threads_view_heading")
+    func findThreadViewHeader(from contentList: Element) async throws -> Element? {
+        return try await findElementWithDOMIdentifierPrefix(
+            from: contentList,
+            prefix: "threads_view_heading"
+        )
+    }
+    
+    /// Find thread view footer element  
+    /// Based on reference SlackParser.swift:148 - domId.starts(with: "threads_view_footer")
+    func findThreadViewFooter(from contentList: Element) async throws -> Element? {
+        return try await findElementWithDOMIdentifierPrefix(
+            from: contentList,
+            prefix: "threads_view_footer"
+        )
+    }
 }

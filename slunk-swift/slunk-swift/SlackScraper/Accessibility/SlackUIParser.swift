@@ -16,6 +16,7 @@ public actor SlackUIParser {
     private let elementFinder = SlackElementFinder()
     private let messageParser = SlackMessageParser()
     private let workspaceParser = SlackWorkspaceParser()
+    private let threadParser = SlackThreadParser()
     
     private init() {}
     
@@ -80,6 +81,19 @@ public actor SlackUIParser {
         }
         
         print("✅ SlackUIParser: Found primary view contents")
+        
+        // Step 4.5: Check for thread view (based on reference SlackParser.swift:72-76)
+        let isThreadView = try await workspaceParser.detectThreadView(from: viewContents)
+        if isThreadView {
+            // Use thread parser to handle thread view
+            if let threadConversation = try await threadParser.parseThreadView(
+                from: viewContents,
+                workspace: finalWorkspace
+            ) {
+                return threadConversation
+            }
+            // Fall back to regular parsing if thread parsing fails
+        }
         
         // Step 5: Find content list with messages
         guard let contentList = try await elementFinder.findElementWithRole(
