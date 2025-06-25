@@ -32,6 +32,11 @@ public actor SlackUIParser {
         
         print("✅ SlackUIParser: Found webArea element")
         
+        // Debug: Check window title from application element
+        if let appTitle = try applicationElement.getAttributeValue(.title) as? String {
+            print("🔍 DEBUG: Application window title: '\(appTitle)'")
+        }
+        
         // Step 2: Find workspace wrapper using class matching
         guard let workspaceWrapper = try await findElementWithClass(
             from: webAreaElement,
@@ -44,8 +49,47 @@ public actor SlackUIParser {
         print("✅ SlackUIParser: Found workspace wrapper")
         
         // Step 3: Extract workspace name
-        let workspace = try await extractWorkspaceName(from: workspaceWrapper) ?? "Unknown Workspace"
-        print("🔍 SlackUIParser: Workspace: \(workspace)")
+        // First try from the window title (most reliable)
+        var workspace: String? = nil
+        
+        // Get window title directly
+        let windowMatcher = Matchers.all([
+            Matchers.hasRole(.window),
+            Matchers.hasAttribute(.subrole, equalTo: Subrole(rawValue: "AXStandardWindow"))
+        ])
+        
+        if let window = try await applicationElement.findElement(
+            matching: windowMatcher,
+            maxDepth: 2,
+            deadline: Deadline.fromNow(duration: 1.0)
+        ) as? Element {
+            if let windowTitle = try window.getAttributeValue(.title) as? String {
+                print("🔍 DEBUG: Window title: '\(windowTitle)'")
+                workspace = parseWorkspaceFromTitle(windowTitle)
+            }
+        }
+        
+        // If not found, try from workspace wrapper
+        if workspace == nil {
+            workspace = try await extractWorkspaceName(from: workspaceWrapper)
+        }
+        
+        // If still not found, look for workspace switcher element
+        if workspace == nil {
+            print("🔍 DEBUG: Looking for workspace switcher...")
+            let switcherMatcher = Matchers.hasClassContaining("p-workspace_switcher")
+            if let switcher = try await webAreaElement.findElement(
+                matching: switcherMatcher,
+                maxDepth: 10,
+                deadline: Deadline.fromNow(duration: 2.0)
+            ) {
+                workspace = try switcher.getValue()
+                print("   ✅ Found workspace from switcher: '\(workspace ?? "nil")'")
+            }
+        }
+        
+        let finalWorkspace = workspace ?? "Unknown Workspace"
+        print("🔍 SlackUIParser: Workspace: \(finalWorkspace)")
         
         // Step 4: Find primary view contents
         guard let viewContents = try await findElementWithClass(
@@ -79,7 +123,7 @@ public actor SlackUIParser {
         print("🔍 SlackUIParser: Parsed \(messages.count) messages")
         
         return SlackConversation(
-            workspace: workspace,
+            workspace: finalWorkspace,
             channel: channel,
             channelType: determineChannelType(from: channel),
             messages: messages
@@ -92,14 +136,47 @@ public actor SlackUIParser {
     private func findWebAreaElement(from applicationElement: Element) async throws -> Element? {
         print("🔍 SlackUIParser: Searching for webArea element...")
         
-        // Use LBAccessibility matcher for webArea role
+        // First, let's find the main window
+        let windowMatcher = Matchers.all([
+            Matchers.hasRole(.window),
+            Matchers.hasAttribute(.subrole, equalTo: Subrole(rawValue: "AXStandardWindow"))
+        ])
+        
+        guard let window = try await applicationElement.findElement(
+            matching: windowMatcher,
+            maxDepth: 2,
+            deadline: Deadline.fromNow(duration: 2.0)
+        ) as? Element else {
+            print("❌ SlackUIParser: No window found")
+            return nil
+        }
+        
+        print("✅ SlackUIParser: Found window")
+        
+        // Now look for webArea within the window
         let webAreaMatcher = Matchers.hasRole(.webArea)
         
-        return try await applicationElement.findElement(
+        let webArea = try await window.findElement(
             matching: webAreaMatcher,
-            maxDepth: 10,
+            maxDepth: 15,
             deadline: Deadline.fromNow(duration: 5.0)
         ) as? Element
+        
+        if webArea == nil {
+            print("❌ SlackUIParser: No webArea found in window")
+            // Let's debug what we can find
+            if let children = try window.getChildren() {
+                print("🔍 Window has \(children.count) direct children")
+                for (index, child) in children.prefix(5).enumerated() {
+                    if let childElement = child as? Element,
+                       let role = try? childElement.getAttributeValue(.role) as? Role {
+                        print("  Child \(index): \(role.rawValue)")
+                    }
+                }
+            }
+        }
+        
+        return webArea
     }
     
     /// Find element with specific CSS class using LBAccessibility
@@ -146,14 +223,43 @@ public actor SlackUIParser {
     
     /// Extract workspace name from element
     private func extractWorkspaceName(from element: Element) async throws -> String? {
+        print("🔍 DEBUG: Extracting workspace name...")
+        
+        // Debug: Print all available attributes
+        let attributes: [Attribute] = [.title, .description, .value, .help]
+        for attr in attributes {
+            if let value = try? element.getAttributeValue(attr) as? String {
+                print("   📊 \(attr): '\(value)'")
+            }
+        }
+        
         // Try to get workspace from window title or element attributes
         if let title = try element.getAttributeValue(.title) as? String {
-            return parseWorkspaceFromTitle(title)
+            print("   🔍 Found title: '\(title)'")
+            let parsed = parseWorkspaceFromTitle(title)
+            print("   🔍 Parsed workspace: '\(parsed ?? "nil")'")
+            return parsed
         }
         
         // Try description attribute
         if let description = try element.getAttributeValue(.description) as? String {
+            print("   🔍 Found description: '\(description)'")
             return parseWorkspaceFromTitle(description)
+        }
+        
+        // Try to find workspace info in children
+        if let children = try element.getChildren() {
+            print("   🔍 Checking \(children.count) children for workspace info...")
+            for (index, child) in children.prefix(5).enumerated() {
+                if let childElement = child as? Element {
+                    if let value = try? childElement.getValue() {
+                        print("   📊 Child \(index) value: '\(value)'")
+                    }
+                    if let title = try? childElement.getAttributeValue(.title) as? String {
+                        print("   📊 Child \(index) title: '\(title)'")
+                    }
+                }
+            }
         }
         
         return nil
@@ -161,26 +267,62 @@ public actor SlackUIParser {
     
     /// Extract channel name from content list element
     private func extractChannelName(from element: Element) async throws -> String? {
-        // Try to get channel name from element description or title
-        if let description = try element.getAttributeValue(.description) as? String,
-           !description.isEmpty {
-            return description
+        print("🔍 DEBUG: Extracting channel name...")
+        
+        // Debug: Print element attributes
+        if let description = try element.getAttributeValue(.description) as? String {
+            print("   📊 Content list description: '\(description)'")
+            if !description.isEmpty {
+                return description
+            }
         }
         
-        if let title = try element.getAttributeValue(.title) as? String,
-           !title.isEmpty {
-            return title
+        if let title = try element.getAttributeValue(.title) as? String {
+            print("   📊 Content list title: '\(title)'")
+            if !title.isEmpty {
+                return title
+            }
         }
         
-        // Try to find a channel header element within the list
-        let channelHeaderMatcher = Matchers.hasClassContaining("channel")
+        // Try to find channel info in various ways
+        print("   🔍 Looking for channel header elements...")
         
-        if let headerElement = try await element.findElement(
-            matching: channelHeaderMatcher,
-            maxDepth: 5,
-            deadline: Deadline.fromNow(duration: 2.0)
-        ) {
-            return try headerElement.getValue()
+        // Look for elements with channel-related classes
+        let channelMatchers = [
+            Matchers.hasClassContaining("channel"),
+            Matchers.hasClassContaining("p-channel"),
+            Matchers.hasClassContaining("header"),
+            Matchers.hasClassContaining("title")
+        ]
+        
+        for (index, matcher) in channelMatchers.enumerated() {
+            if let headerElement = try await element.findElement(
+                matching: matcher,
+                maxDepth: 5,
+                deadline: Deadline.fromNow(duration: 2.0)
+            ) {
+                if let value = try headerElement.getValue() {
+                    print("   ✅ Found channel via matcher \(index): '\(value)'")
+                    return value
+                }
+            }
+        }
+        
+        // Try to find any text in the first few children
+        if let children = try element.getChildren() {
+            print("   🔍 Checking first children for channel info...")
+            for (index, child) in children.prefix(10).enumerated() {
+                if let childElement = child as? Element {
+                    if let value = try? childElement.getValue(), !value.isEmpty {
+                        print("   📊 Child \(index) text: '\(value)'")
+                        // Look for channel patterns
+                        if value.hasPrefix("#") || value.hasPrefix("@") {
+                            print("   ✅ Found channel name: '\(value)'")
+                            return value
+                        }
+                    }
+                }
+            }
         }
         
         return nil
@@ -249,25 +391,108 @@ public actor SlackUIParser {
         var sender: String?
         var timestamp: Date?
         
+        print("   🔍 Looking for sender in \(mainChildren.count) children...")
+        
         // Extract sender and timestamp from main children
-        for child in mainChildren {
-            if let childElement = child as? Element,
-               let role = try childElement.getAttributeValue(.role) as? Role {
-                if role == .button {
-                    // Sender name is often in a button element
-                    sender = try childElement.getAttributeValue(.title) as? String
-                } else if role == .link {
-                    // Timestamp is often in a link element
-                    if let description = try childElement.getAttributeValue(.description) as? String,
-                       description.contains("at ") {
-                        timestamp = parseSlackTimestamp(from: description)
+        for (childIndex, child) in mainChildren.enumerated() {
+            if let childElement = child as? Element {
+                // Debug: print all attributes of each child
+                if let role = try? childElement.getAttributeValue(.role) as? Role {
+                    print("   📊 Child \(childIndex) role: \(role.rawValue)")
+                    
+                    // Try multiple attributes for sender name
+                    if let title = try? childElement.getAttributeValue(.title) as? String {
+                        print("     - title: '\(title)'")
                     }
+                    if let value = try? childElement.getValue() {
+                        print("     - value: '\(value)'")
+                    }
+                    if let desc = try? childElement.getAttributeValue(.description) as? String {
+                        print("     - description: '\(desc)'")
+                    }
+                    
+                    if role == .button && sender == nil {
+                        // Sender name is often in a button element
+                        let buttonTitle = try childElement.getAttributeValue(.title) as? String
+                        let buttonValue = try childElement.getValue()
+                        let potentialSender = buttonTitle ?? buttonValue
+                        
+                        // Filter out buttons that are clearly not senders
+                        if let s = potentialSender, 
+                           !s.contains("replies") && 
+                           !s.contains("reaction") && 
+                           !s.contains("thread") &&
+                           !s.contains("edited") &&
+                           !s.isEmpty {
+                            sender = s
+                            print("   ✅ Found sender from button: '\(s)'")
+                        }
+                    } else if role == .link {
+                        // Could be sender or timestamp
+                        let linkText = try childElement.getValue() ?? ""
+                        let linkDesc = try childElement.getAttributeValue(.description) as? String ?? ""
+                        
+                        print("     - link text: '\(linkText)'")
+                        print("     - link desc: '\(linkDesc)'")
+                        
+                        // Check if it's a timestamp
+                        if linkDesc.contains("at ") {
+                            timestamp = parseSlackTimestamp(from: linkDesc)
+                        } else if sender == nil && !linkText.isEmpty {
+                            // Might be the sender name as a link
+                            sender = linkText
+                            print("   ✅ Found sender from link: '\(sender ?? "")'")
+                        }
+                    } else if role == .staticText && sender == nil {
+                        // Sometimes sender is just static text
+                        if let text = try childElement.getValue(), !text.isEmpty {
+                            // Check if this looks like a username
+                            if !text.contains(":") && text.count < 50 {
+                                sender = text
+                                print("   ✅ Found sender from static text: '\(sender ?? "")'")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // If still no sender, look deeper in the tree
+        if sender == nil {
+            print("   🔍 No sender found in direct children, searching deeper...")
+            
+            // Look for any element with a reasonable username
+            let usernameMatcher = Matchers.any([
+                Matchers.hasRole(.button),
+                Matchers.hasRole(.link),
+                Matchers.hasClassContaining("author"),
+                Matchers.hasClassContaining("sender"),
+                Matchers.hasClassContaining("username")
+            ])
+            
+            if let senderElement = try await mainGroup.findElement(
+                matching: usernameMatcher,
+                maxDepth: 5,
+                deadline: Deadline.fromNow(duration: 1.0)
+            ) {
+                sender = try? senderElement.getValue()
+                if sender == nil {
+                    sender = try? senderElement.getAttributeValue(.title) as? String
+                }
+                if let s = sender {
+                    print("   ✅ Found sender via deep search: '\(s)'")
                 }
             }
         }
         
         // Extract message content using tree traversal
         let content = try await extractMessageContent(from: mainGroup)
+        
+        // If we have content but no sender, use a placeholder
+        if let content = content, !content.isEmpty, sender == nil {
+            sender = "Unknown User"
+            print("   ⚠️ Using placeholder sender for message with content")
+        }
         
         guard let content = content, !content.isEmpty,
               let sender = sender else {
@@ -301,30 +526,86 @@ public actor SlackUIParser {
     
     /// Parse workspace name from title string
     private func parseWorkspaceFromTitle(_ title: String) -> String? {
-        // Pattern: "Something - WorkspaceName - Slack"
-        guard let endRange = title.range(of: " - Slack", options: .backwards) else {
-            return nil
+        print("🔍 DEBUG: Parsing workspace from title: '\(title)'")
+        
+        // Common patterns:
+        // 1. "js-help (Channel) - LangChain Community - Slack" (your current format)
+        // 2. "Channel - Workspace - Slack"
+        // 3. "Workspace - Slack"
+        // 4. "Slack | Workspace | #channel"
+        
+        // Pattern 1: Try "Something - WorkspaceName - Slack"
+        if let endRange = title.range(of: " - Slack", options: .backwards) {
+            let beforeSlack = title[..<endRange.lowerBound]
+            
+            if let lastDashRange = beforeSlack.range(of: " - ", options: .backwards) {
+                let workspaceStart = lastDashRange.upperBound
+                let workspace = String(title[workspaceStart..<endRange.lowerBound])
+                print("   ✅ Parsed workspace (pattern 1): '\(workspace)'")
+                return workspace
+            } else {
+                // Only one part before " - Slack"
+                let workspace = String(beforeSlack)
+                print("   ✅ Parsed workspace (pattern 1b): '\(workspace)'")
+                return workspace
+            }
         }
         
-        let beforeSlack = title[..<endRange.lowerBound]
-        
-        guard let lastDashRange = beforeSlack.range(of: " - ", options: .backwards) else {
-            return String(beforeSlack)
+        // Pattern 2: Try "Slack | Workspace | ..."
+        if title.hasPrefix("Slack") && title.contains(" | ") {
+            let parts = title.split(separator: "|").map { $0.trimmingCharacters(in: .whitespaces) }
+            if parts.count >= 2 {
+                let workspace = parts[1]
+                print("   ✅ Parsed workspace (pattern 2): '\(workspace)'")
+                return workspace
+            }
         }
         
-        let workspaceStart = lastDashRange.upperBound
-        return String(title[workspaceStart..<endRange.lowerBound])
+        print("   ❌ Could not parse workspace from title")
+        return nil
     }
     
     /// Parse Slack timestamp from description string
     private func parseSlackTimestamp(from description: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        
-        // Extract time from description like "at 2:30 PM"
-        if let timeRange = description.range(of: "at ") {
-            let timeString = String(description[timeRange.upperBound...])
-            return formatter.date(from: timeString)
+        // Handle formats like "Today at 6:47:45 AM" or "Yesterday at 2:30 PM"
+        if let atRange = description.range(of: " at ") {
+            let timeString = String(description[atRange.upperBound...])
+            
+            // Try different time formats
+            let formatters = [
+                ("h:mm:ss a", DateFormatter()),  // 6:47:45 AM
+                ("h:mm a", DateFormatter()),      // 2:30 PM
+                ("HH:mm:ss", DateFormatter()),    // 18:47:45
+                ("HH:mm", DateFormatter())        // 18:47
+            ]
+            
+            for (format, formatter) in formatters {
+                formatter.dateFormat = format
+                formatter.locale = Locale(identifier: "en_US")
+                if let date = formatter.date(from: timeString) {
+                    // Combine with today's date
+                    let calendar = Calendar.current
+                    let now = Date()
+                    
+                    if description.hasPrefix("Today") {
+                        let components = calendar.dateComponents([.hour, .minute, .second], from: date)
+                        return calendar.date(bySettingHour: components.hour ?? 0,
+                                           minute: components.minute ?? 0,
+                                           second: components.second ?? 0,
+                                           of: now)
+                    } else if description.hasPrefix("Yesterday") {
+                        let components = calendar.dateComponents([.hour, .minute, .second], from: date)
+                        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now) {
+                            return calendar.date(bySettingHour: components.hour ?? 0,
+                                               minute: components.minute ?? 0,
+                                               second: components.second ?? 0,
+                                               of: yesterday)
+                        }
+                    }
+                    
+                    return date
+                }
+            }
         }
         
         return nil
@@ -351,21 +632,16 @@ public extension SlackUIParser {
     func debugElementTree(from element: Element, maxDepth: Int = 5) async {
         print("🌳 SlackUIParser: Printing element tree with LBAccessibility...")
         
-        do {
-            // Create a simple debug output instead of dumpSendable
-            let role = try? element.getAttributeValue(.role) as? Role
-            let title = try? element.getAttributeValue(.title) as? String
-            let description = try? element.getAttributeValue(.description) as? String
-            let children = try? element.getChildren()
-            
-            print("Element:")
-            print("  Role: \(role?.rawValue ?? "nil")")
-            print("  Title: \(title ?? "nil")")
-            print("  Description: \(description ?? "nil")")
-            print("  Children: \(children?.count ?? 0)")
-            
-        } catch {
-            print("❌ SlackUIParser: Error dumping element tree: \(error)")
-        }
+        // Create a simple debug output instead of dumpSendable
+        let role = try? element.getAttributeValue(.role) as? Role
+        let title = try? element.getAttributeValue(.title) as? String
+        let description = try? element.getAttributeValue(.description) as? String
+        let children = try? element.getChildren()
+        
+        print("Element:")
+        print("  Role: \(role?.rawValue ?? "nil")")
+        print("  Title: \(title ?? "nil")")
+        print("  Description: \(description ?? "nil")")
+        print("  Children: \(children?.count ?? 0)")
     }
 }
