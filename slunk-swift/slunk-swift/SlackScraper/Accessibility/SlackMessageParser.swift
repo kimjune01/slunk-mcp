@@ -12,6 +12,9 @@ actor SlackMessageParser {
     func parseMessagesFromContentList(_ contentList: Element) async throws -> [SlackMessage] {
         print("🔍 SlackMessageParser: Parsing messages from content list...")
         
+        // Check if this is a thread sidebar for processing context
+        let _ = (try? contentList.getAttributeValue(.description) as? String)?.contains("Thread") ?? false
+        
         // Get all child elements that might be messages
         guard let children = try contentList.getChildren() else {
             print("❌ SlackMessageParser: No children found in content list")

@@ -157,6 +157,21 @@ actor SlackWorkspaceParser {
         return nil
     }
     
+    // MARK: - Thread View Detection
+    
+    /// Detect if current view is a thread view (based on reference SlackParser.swift:72-76)
+    func detectThreadView(from viewContents: Element) async throws -> Bool {
+        if let viewContentsDescription = try viewContents.getAttributeValue(.description) as? String {
+            let isThreadView = viewContentsDescription == "Threads"
+            if isThreadView {
+                print("✅ THREAD VIEW DETECTED")
+            }
+            return isThreadView
+        }
+        
+        return false
+    }
+    
     // MARK: - Channel Type Determination
     
     /// Determine channel type from channel name

@@ -96,30 +96,55 @@ public actor SlackUIParser {
         }
         
         // Step 5: Find content list with messages
-        guard let contentList = try await elementFinder.findElementWithRole(
+        // Search for content lists in the entire workspace wrapper (for thread sidebars)
+        let allContentListsInWorkspace = try await elementFinder.findAllElementsWithRole(
+            from: workspaceWrapper,
+            role: .list,
+            subrole: .contentList
+        )
+        
+        // Also check in primary view contents
+        let allContentLists = try await elementFinder.findAllElementsWithRole(
             from: viewContents,
             role: .list,
             subrole: .contentList
-        ) else {
+        )
+        
+        guard let contentList = allContentLists.first else {
             print("❌ SlackUIParser: No content list found")
             return nil
         }
         
-        print("✅ SlackUIParser: Found content list")
+        print("✅ SlackUIParser: Found content list for parsing")
         
         // Step 6: Extract channel information
         let channel = try await workspaceParser.extractChannelName(from: contentList) ?? "Unknown Channel"
         print("🔍 SlackUIParser: Channel: \(channel)")
         
         // Step 7: Parse messages from content list
-        let messages = try await messageParser.parseMessagesFromContentList(contentList)
-        print("🔍 SlackUIParser: Parsed \(messages.count) messages")
+        var allMessages = try await messageParser.parseMessagesFromContentList(contentList)
+        
+        // Step 8: Check for thread sidebar and parse it too
+        if allContentListsInWorkspace.count > 1 {
+            for (index, threadList) in allContentListsInWorkspace.enumerated() {
+                if index == 0 { continue } // Skip the main channel we already parsed
+                
+                if let threadDesc = try? threadList.getAttributeValue(.description) as? String,
+                   threadDesc.contains("Thread") {
+                    print("🧵 SlackUIParser: Found thread sidebar")
+                    let threadMessages = try await messageParser.parseMessagesFromContentList(threadList)
+                    allMessages.append(contentsOf: threadMessages)
+                }
+            }
+        }
+        
+        print("🔍 SlackUIParser: Parsed \(allMessages.count) total messages")
         
         return SlackConversation(
             workspace: finalWorkspace,
             channel: channel,
             channelType: workspaceParser.determineChannelType(from: channel),
-            messages: messages
+            messages: allMessages.sorted { $0.timestamp > $1.timestamp } // Sort by timestamp
         )
     }
     

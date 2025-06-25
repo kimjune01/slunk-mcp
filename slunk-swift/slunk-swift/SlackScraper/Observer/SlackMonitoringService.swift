@@ -236,6 +236,9 @@ public final class SlackMonitoringService: ObservableObject {
             lastExtractedConversation = conversation
             extractionHistory.append(conversation)
             
+            // Log successful content extraction
+            print("   🎯 UI UPDATE: Sending \(conversation.messages.count) messages to UI")
+            
             // Keep only last 10 extractions to avoid memory bloat
             if extractionHistory.count > 10 {
                 extractionHistory.removeFirst()

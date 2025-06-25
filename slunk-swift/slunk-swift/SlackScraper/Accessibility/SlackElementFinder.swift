@@ -99,6 +99,30 @@ actor SlackElementFinder {
         ) as? Element
     }
     
+    /// Find all elements with specific role and subrole
+    func findAllElementsWithRole(
+        from element: Element,
+        role: Role,
+        subrole: Subrole? = nil
+    ) async throws -> [Element] {
+        var matchers: [ElementMatcher] = [Matchers.hasRole(role)]
+        
+        if let subrole = subrole {
+            matchers.append(Matchers.hasAttribute(.subrole, equalTo: subrole))
+        }
+        
+        let combinedMatcher = Matchers.all(matchers)
+        
+        // Use findElements (plural) to get all matching elements
+        let foundElements = try await element.findElements(
+            matching: combinedMatcher,
+            maxDepth: 10,
+            deadline: Deadline.fromNow(duration: 3.0)
+        )
+        
+        return foundElements.compactMap { $0 as? Element }
+    }
+    
     // MARK: - Find Window
     
     /// Find the main Slack window
