@@ -35,7 +35,7 @@ actor SlackMessageParser {
     
     /// Parse individual message element
     func parseMessageElement(_ element: Element, index: Int) async throws -> SlackMessage? {
-        print("🔍 SlackMessageParser: Parsing message element \(index)")
+        // Parse message element structure
         
         // Look for message structure - messages often have specific role descriptions
         guard let children = try element.getChildren(), !children.isEmpty else {
@@ -57,7 +57,7 @@ actor SlackMessageParser {
     
     /// Extract message content from message group element
     func extractMessageFromGroup(_ messageGroup: Element, index: Int) async throws -> SlackMessage? {
-        print("🔍 SlackMessageParser: Extracting message from group \(index)")
+        // Extract message from group structure
         
         guard let groupChildren = try messageGroup.getChildren(),
               let mainGroup = groupChildren.first as? Element else {
@@ -71,25 +71,13 @@ actor SlackMessageParser {
         var sender: String?
         var timestamp: Date?
         
-        print("   🔍 Looking for sender in \(mainChildren.count) children...")
+        // Look for sender in main children
         
         // Extract sender and timestamp from main children
         for (childIndex, child) in mainChildren.enumerated() {
             if let childElement = child as? Element {
-                // Debug: print all attributes of each child
+                // Try multiple attributes for sender name
                 if let role = try? childElement.getAttributeValue(.role) as? Role {
-                    print("   📊 Child \(childIndex) role: \(role.rawValue)")
-                    
-                    // Try multiple attributes for sender name
-                    if let title = try? childElement.getAttributeValue(.title) as? String {
-                        print("     - title: '\(title)'")
-                    }
-                    if let value = try? childElement.getValue() {
-                        print("     - value: '\(value)'")
-                    }
-                    if let desc = try? childElement.getAttributeValue(.description) as? String {
-                        print("     - description: '\(desc)'")
-                    }
                     
                     if role == .button && sender == nil {
                         // Sender name is often in a button element
@@ -111,9 +99,6 @@ actor SlackMessageParser {
                         // Could be sender or timestamp
                         let linkText = try childElement.getValue() ?? ""
                         let linkDesc = try childElement.getAttributeValue(.description) as? String ?? ""
-                        
-                        print("     - link text: '\(linkText)'")
-                        print("     - link desc: '\(linkDesc)'")
                         
                         // Check if it's a timestamp
                         if linkDesc.contains("at ") {

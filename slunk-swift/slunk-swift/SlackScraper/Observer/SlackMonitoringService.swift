@@ -149,7 +149,7 @@ public final class SlackMonitoringService: ObservableObject {
                     print("   ℹ️ Content parsing disabled (accessibility permissions needed)")
                 }
             } else {
-                print("🟡 Slack is running but not in focus (PID: \(slackState.pid))")
+                // Slack is running but not in focus - no logging needed for normal operation
             }
         } else {
             print("🔍 Scanning for Slack... (not currently running)")
@@ -279,7 +279,6 @@ public actor SlackAppObserver {
         for app in runningApps {
             if let bundleId = app.bundleIdentifier,
                Self.slackBundleIds.contains(bundleId) {
-                print("✅ Found Slack app by bundle ID: \(bundleId), PID: \(app.processIdentifier)")
                 return AppState(runningApplication: app)
             }
         }
