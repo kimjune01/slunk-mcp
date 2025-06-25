@@ -4,34 +4,26 @@ import GRDB
 
 struct ButtonAction {
     static func perform() {
-        print("Button action triggered!")
         do {
-            print("Setting up database...")
             try HistoryDatabase.setup()
             guard let dbQueue = HistoryDatabase.dbQueue else {
-                print("Database queue not available.")
                 return
             }
-            print("Inserting a new history row...")
+            
             let newHistory = History(id: nil, text: "Hello, SQLite via GRDB!")
             try dbQueue.write { db in
                 try newHistory.insert(db)
             }
-            print("Inserted row. Now fetching all rows...")
+            
             let allHistory: [History] = try dbQueue.read { db in
                 try History.fetchAll(db)
             }
-            print("Fetched rows:")
-            for history in allHistory {
-                print("id: \(history.id ?? -1), text: \(history.text)")
-            }
-            print("Now deleting all rows from history table...")
+            
             try dbQueue.write { db in
                 _ = try History.deleteAll(db)
             }
-            print("All rows deleted. Round trip complete.")
         } catch {
-            print("Error during round trip: \(error)")
+            // Database test failed
         }
     }
 }

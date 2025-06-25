@@ -1,11 +1,12 @@
 import Foundation
+import GRDB
 import SQLiteVec
 
 // MARK: - Slack-Specific Database Schema with Deduplication
 
 class SlackDatabaseSchema {
     let databaseURL: URL
-    var database: Database?
+    var database: DatabaseQueue?
     
     // MARK: - Initialization
     
@@ -41,7 +42,7 @@ class SlackDatabaseSchema {
     }
     
     private func openDatabase() throws {
-        database = try Database(.uri(databaseURL.path))
+        database = try DatabaseQueue(path: databaseURL.path)
     }
     
     private func closeDatabase() {
@@ -89,7 +90,9 @@ class SlackDatabaseSchema {
             )
         """
         
-        try await database.execute(sql)
+        try await database.write { db in
+            try db.execute(sql: sql)
+        }
     }
     
     func createReactionsTable() async throws {
@@ -109,7 +112,9 @@ class SlackDatabaseSchema {
             )
         """
         
-        try await database.execute(sql)
+        try await database.write { db in
+            try db.execute(sql: sql)
+        }
     }
     
     func createIngestionLogTable() async throws {
@@ -133,7 +138,9 @@ class SlackDatabaseSchema {
             )
         """
         
-        try await database.execute(sql)
+        try await database.write { db in
+            try db.execute(sql: sql)
+        }
     }
     
     func createVectorTable() async throws {
@@ -149,7 +156,9 @@ class SlackDatabaseSchema {
             )
         """
         
-        try await database.execute(sql)
+        try await database.write { db in
+            try db.execute(sql: sql)
+        }
     }
     
     func createIndexes() async throws {
@@ -181,7 +190,9 @@ class SlackDatabaseSchema {
         ]
         
         for indexSQL in indexes {
-            try await database.execute(indexSQL)
+            try await database.write { db in
+                try db.execute(sql: indexSQL)
+            }
         }
     }
     
@@ -197,11 +208,13 @@ class SlackDatabaseSchema {
         
         // Check if message exists
         let existingSQL = "SELECT * FROM slack_messages WHERE id = ? AND workspace = ? AND channel = ?"
-        let existing = try await database.query(existingSQL, params: [messageId, workspace, channel])
+        let existing = try await database.read { db in
+            return try Row.fetchAll(db, sql: existingSQL, arguments: [messageId, workspace, channel])
+        }
         
         if let existingRow = existing.first {
-            let existingHash = existingRow["content_hash"] as? String ?? ""
-            let existingContent = existingRow["content"] as? String ?? ""
+            let existingHash: String = existingRow["content_hash"] ?? ""
+            let existingContent: String = existingRow["content"] ?? ""
             
             // Check if content changed (message edited)
             if existingHash != contentHash || existingContent != message.content {
@@ -242,20 +255,22 @@ class SlackDatabaseSchema {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         
-        try await database.execute(sql, params: [
-            messageId,
-            workspace,
-            channel,
-            message.sender,
-            message.content,
-            message.timestamp,
-            message.threadId,
-            mentionsJSON,
-            attachmentsJSON,
-            message.contentHash,
-            message.metadata?.version ?? 1,
-            message.metadata?.editedAt
-        ])
+        try await database.write { db in
+            try db.execute(sql: sql, arguments: [
+                messageId,
+                workspace,
+                channel,
+                message.sender,
+                message.content,
+                message.timestamp,
+                message.threadId,
+                mentionsJSON,
+                attachmentsJSON,
+                message.contentHash,
+                message.metadata?.version ?? 1,
+                message.metadata?.editedAt
+            ])
+        }
         
         // Insert reactions if any
         if let reactions = message.metadata?.reactions {
@@ -279,16 +294,18 @@ class SlackDatabaseSchema {
             WHERE id = ? AND workspace = ? AND channel = ?
         """
         
-        try await database.execute(sql, params: [
-            message.content,
-            message.contentHash,
-            message.metadata?.editedAt ?? Date(),
-            mentionsJSON,
-            attachmentsJSON,
-            messageId,
-            workspace,
-            channel
-        ])
+        try await database.write { db in
+            try db.execute(sql: sql, arguments: [
+                message.content,
+                message.contentHash,
+                message.metadata?.editedAt ?? Date(),
+                mentionsJSON,
+                attachmentsJSON,
+                messageId,
+                workspace,
+                channel
+            ])
+        }
     }
     
     private func insertReactions(messageId: String, reactions: [String: Int]) async throws {
@@ -297,12 +314,14 @@ class SlackDatabaseSchema {
         }
         
         // Clear existing reactions
-        try await database.execute("DELETE FROM slack_reactions WHERE message_id = ?", params: [messageId])
-        
-        // Insert new reactions
-        for (emoji, count) in reactions {
-            let sql = "INSERT INTO slack_reactions (message_id, emoji, count) VALUES (?, ?, ?)"
-            try await database.execute(sql, params: [messageId, emoji, count])
+        try await database.write { db in
+            try db.execute(sql: "DELETE FROM slack_reactions WHERE message_id = ?", arguments: [messageId])
+            
+            // Insert new reactions
+            for (emoji, count) in reactions {
+                let sql = "INSERT INTO slack_reactions (message_id, emoji, count) VALUES (?, ?, ?)"
+                try db.execute(sql: sql, arguments: [messageId, emoji, count])
+            }
         }
     }
     
@@ -316,7 +335,9 @@ class SlackDatabaseSchema {
         }
         
         let sql = "SELECT emoji, count FROM slack_reactions WHERE message_id = ?"
-        let results = try await database.query(sql, params: [messageId])
+        let results = try await database.read { db in
+            return try Row.fetchAll(db, sql: sql, arguments: [messageId])
+        }
         
         if results.isEmpty {
             return nil
@@ -324,10 +345,9 @@ class SlackDatabaseSchema {
         
         var reactions: [String: Int] = [:]
         for row in results {
-            if let emoji = row["emoji"] as? String,
-               let count = row["count"] as? Int {
-                reactions[emoji] = count
-            }
+            let emoji: String = row["emoji"]
+            let count: Int = row["count"]
+            reactions[emoji] = count
         }
         
         return reactions
@@ -352,15 +372,17 @@ class SlackDatabaseSchema {
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
         """
         
-        try await database.execute(sql, params: [
-            sessionId,
-            workspace,
-            channel,
-            stats.totalProcessed,
-            stats.newMessages,
-            stats.updates,
-            stats.duplicates
-        ])
+        try await database.write { db in
+            try db.execute(sql: sql, arguments: [
+                sessionId,
+                workspace,
+                channel,
+                stats.totalProcessed,
+                stats.newMessages,
+                stats.updates,
+                stats.duplicates
+            ])
+        }
     }
     
     // MARK: - Helper Methods

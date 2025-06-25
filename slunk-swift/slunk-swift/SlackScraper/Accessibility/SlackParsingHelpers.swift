@@ -220,26 +220,9 @@ public struct SlackParsingHelpers {
     
     // MARK: - Debug Helpers
     
-    /// Print element attributes for debugging
+    /// Print element attributes for debugging (disabled in production)
     static func debugElement(_ element: Element, label: String = "Element") {
-        print("🐛 Debug \(label):")
-        
-        let attributes: [Attribute] = [.role, .title, .description, .value, .help]
-        for attr in attributes {
-            if let value = try? element.getAttributeValue(attr) {
-                print("   \(attr): \(value)")
-            }
-        }
-        
-        // Try to get children count
-        if let children = try? element.getChildren() {
-            print("   children: \(children.count)")
-        }
-        
-        // Try to get class list
-        if let classList = try? element.getAttributeValue("AXDOMClassList") as? [String] {
-            print("   classes: \(classList.joined(separator: ", "))")
-        }
+        // Debug logging disabled
     }
     
     /// Create a summary of parsed content for debugging
@@ -302,7 +285,7 @@ public struct SlackParsingHelpers {
         let errorMessage = "❌ Parsing error in \(context): \(error.localizedDescription)"
         
         if let element = element {
-            print(errorMessage)
+            // Error in debug summary generation
             debugElement(element, label: "Failed Element")
         }
         

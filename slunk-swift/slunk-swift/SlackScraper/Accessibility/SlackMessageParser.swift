@@ -15,7 +15,6 @@ actor SlackMessageParser {
         
         // Get all child elements that might be messages
         guard let children = try contentList.getChildren() else {
-            print("❌ SlackMessageParser: No children found in content list")
             return []
         }
         
@@ -187,7 +186,7 @@ actor SlackMessageParser {
         )
         
         // Log successful message extraction
-        print("✅ Extracted message from \(finalMessage.sender)")
+        // Message successfully extracted
         
         return finalMessage
     }
@@ -341,7 +340,7 @@ actor SlackMessageParser {
                 }
             }
         } catch {
-            print("⚠️ Failed to extract reactions: \(error)")
+            // Failed to extract reactions
         }
         
         return reactions
@@ -445,7 +444,7 @@ actor SlackMessageParser {
                 }
             }
         } catch {
-            print("⚠️ Failed to extract attachments: \(error)")
+            // Failed to extract attachments
         }
         
         // Also look for file patterns in the text content
