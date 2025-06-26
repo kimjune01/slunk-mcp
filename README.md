@@ -1,118 +1,109 @@
-# Slunk - Intelligent Slack Search with Advanced NLP
+# Slunk - Real-time Slack Search & Analytics for macOS
 
-Slunk is a production-ready macOS application that provides sophisticated Slack conversation search through an MCP (Model Context Protocol) server. It combines real-time Slack monitoring with advanced contextual search, natural language processing, and conversational AI capabilities.
+Slunk is a Swift-based macOS application that provides intelligent Slack search and analytics through an MCP (Model Context Protocol) server. It monitors Slack in real-time, stores messages locally with automatic deduplication, and offers advanced search capabilities through 9 comprehensive MCP tools.
 
 ## Key Features
 
-- **🔍 Real-time Slack monitoring** with complete conversation capture and thread parsing
-- **🧠 Contextual semantic search** with short message interpretation and context enhancement
-- **🤖 Advanced NLP processing** with intent recognition, entity extraction, and temporal parsing
-- **💬 Conversational search** with multi-turn sessions and interactive refinement
-- **📊 Pattern discovery** and conversation analytics with trend analysis
-- **🎯 13 MCP tools** for comprehensive Slack data interaction
-- **⚡ High performance** with actor-based concurrency and optimized vector search
-- **🛡️ Production-ready** with comprehensive error handling and logging
+- **🔍 Real-time Slack Monitoring** - Automatic message capture and database storage
+- **💾 Local SQLite Database** - Messages stored with deduplication and 2-month retention
+- **🤖 9 MCP Search Tools** - Natural language search, filtering, pattern discovery
+- **🧠 Semantic Search** - 512-dimensional vector embeddings for meaning-based search
+- **📊 Conversation Analytics** - Pattern discovery and trend analysis
+- **🔒 Privacy-First** - All data stored locally on your machine
+- **⚡ High Performance** - Optimized for 100K+ messages
 
 ## Project Structure
 
 ```
 slunk/
-├── slunk-swift/                           # Main Swift macOS application
-│   ├── CONTEXTUAL_SEARCH_STATUS.md       # Complete implementation details
-│   └── slunk-swift/                       # Swift source code
-│       ├── Database/                      # SQLiteVec + contextual search
-│       ├── Services/                      # Core services & conversational search
-│       ├── SlackScraper/                  # Slack monitoring and parsing
-│       └── MCPServer.swift               # MCP server with 13 tools
-├── OVERVIEW.md                            # Project summary and architecture
-├── CLAUDE.md                              # Development guide and architecture
-└── README.md                              # Project overview (this file)
+├── slunk-swift/                    # Swift macOS application
+│   ├── slunk-swift/               
+│   │   ├── Database/              # SQLiteVec database & search
+│   │   ├── Services/              # Query processing & analytics
+│   │   ├── SlackScraper/          # Slack monitoring & parsing
+│   │   ├── MCPServer.swift        # MCP server implementation
+│   │   └── ContentView.swift      # SwiftUI interface
+│   └── slunk-swift.xcodeproj      # Xcode project
+├── CLAUDE.md                       # Development instructions
+└── README.md                       # This file
 ```
 
-## Implementation Status
+## Current Status
 
-**All three development phases are complete:**
+✅ **Fully Implemented:**
+- Real-time Slack monitoring with accessibility API
+- SQLite database with vector search (SQLiteVec)
+- Message deduplication and automatic cleanup (2-month retention)
+- 9 comprehensive MCP tools for search and analysis
+- SwiftUI interface with database statistics
 
-- **✅ Phase 1**: Contextual search foundation with short message interpretation
-- **✅ Phase 2**: MCP tools integration with 4 core Slack querying tools
-- **✅ Phase 3**: Advanced query processing with natural language interface and conversational search
+## Quick Start
 
-**Total:** 13 MCP tools providing comprehensive Slack search and analytics capabilities.
-
-## Quick Setup
-
-1. **Build the application:**
-
+1. **Build the app:**
    ```bash
    cd slunk-swift
    xcodebuild -project slunk-swift.xcodeproj -scheme slunk-swift build
    ```
 
 2. **Run the app:**
-
    ```bash
-   open slunk-swift/Build/Products/Debug/slunk-swift.app
+   open /path/to/slunk-swift.app
    ```
 
 3. **Configure Claude Desktop:**
-   - Click "Copy Config" in the app
-   - Add to your `claude_desktop_config.json`
+   - Click "Copy Config" button in the app
+   - Add the configuration to `~/Library/Application Support/Claude/claude_desktop_config.json`
    - Restart Claude Desktop
 
-## MCP Tools Overview
+## MCP Tools
 
-Slunk provides 13 comprehensive MCP tools organized across three phases:
+The 9 MCP tools provide comprehensive Slack search capabilities:
 
-### Phase 1: Core Vector Search (4 tools)
+### Basic Search
+- **`searchConversations`** - Natural language search across all messages
+  - Example: "Find discussions about the API redesign from last week"
 
-- `searchConversations` - Natural language semantic search
-- `ingestText` - Smart text ingestion with keyword extraction
-- `getConversationStats` - Analytics and statistics
-- `swiftVersion` - System information
+### Advanced Search & Filtering  
+- **`search_messages`** - Search with precise filters (channels, users, dates)
+  - Example: Search #engineering channel for messages from Alice in March
+- **`get_thread_context`** - Extract complete thread conversations
+- **`get_message_context`** - Get meaning for short messages (emoji, "LGTM", etc.)
 
-### Phase 2: Contextual Slack Search (4 tools)
+### Intelligent Query Processing
+- **`parse_natural_query`** - Extract intent and entities from natural language
+- **`intelligent_search`** - Advanced search combining NLP and context
+- **`conversational_search`** - Multi-turn search sessions with refinement
 
-- `search_messages` - Advanced contextual message search
-- `get_thread_context` - Complete thread conversation extraction
-- `get_message_context` - Contextual meaning for short messages
-
-### Phase 3: Advanced Query Processing (5 tools)
-
-- `parse_natural_query` - NLP parsing with intent/entity extraction
-- `intelligent_search` - Context-aware search with NLP enhancement
-- `discover_patterns` - Conversation pattern and trend analysis
-- `suggest_related` - Related content discovery
-- `conversational_search` - Multi-turn search with refinement
+### Analytics & Discovery
+- **`discover_patterns`** - Find recurring topics and communication patterns
+- **`suggest_related`** - Discover related conversations and follow-ups
 
 ## Architecture
 
-Slunk uses a production-ready architecture:
+- **Swift + SwiftUI** - Native macOS application
+- **SQLiteVec** - Vector database for semantic search
+- **GRDB** - SQLite toolkit with custom configuration  
+- **Accessibility API** - Real-time Slack UI monitoring
+- **MCP Protocol** - Standard protocol for AI tool integration
 
-- **Actor-based concurrency** for thread-safe operations
-- **SQLiteVec** for high-performance vector similarity search
-- **Apple's NLEmbedding** for 512-dimensional semantic vectors
-- **Advanced NLP** with intent recognition and entity extraction
-- **Accessibility framework** for real-time Slack UI parsing
-- **MCP protocol** for seamless Claude Desktop integration
+## Requirements
 
-## Performance
+- macOS 13.0+
+- Xcode 15.0+
+- Slack desktop app
+- Accessibility permissions for Slack monitoring
 
-- **Query latency**: 45-80ms average
-- **Scalability**: 100K+ conversations supported
-- **Concurrency**: 50+ concurrent operations
-- **Memory**: Efficient with automatic optimization
-- **Search modes**: Semantic, structured, and hybrid
+## Privacy & Security
 
-## Documentation
+- All data stored locally in `~/Library/Application Support/Slunk/`
+- No external API calls or cloud storage
+- Automatic cleanup of messages older than 2 months
+- Messages are deduplicated by content hash
 
-- **[OVERVIEW.md](OVERVIEW.md)** - Project summary and architecture overview
-- **[CLAUDE.md](CLAUDE.md)** - Development guide for contributors
-- **[CONTEXTUAL_SEARCH_STATUS.md](slunk-swift/CONTEXTUAL_SEARCH_STATUS.md)** - Complete technical implementation details
+## Development
 
-## Getting Started
-
-Ready to use! All three development phases are complete. See [OVERVIEW.md](OVERVIEW.md) for a comprehensive summary of capabilities and architecture.
+See [CLAUDE.md](CLAUDE.md) for development instructions and architecture details.
 
 ## License
 
-[Add your license information here]
+MIT
