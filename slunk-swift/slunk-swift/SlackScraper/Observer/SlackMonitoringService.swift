@@ -13,7 +13,9 @@ public final class SlackMonitoringService: ObservableObject {
     @Published public private(set) var extractionHistory: [SlackConversation] = []
     
     // MARK: - Constants
-    private static let pollInterval: TimeInterval = 1.0
+    private static let pollIntervalActive: TimeInterval = 1.0
+    private static let pollIntervalBackground: TimeInterval = 5.0
+    private static let pollIntervalInactive: TimeInterval = 10.0
     private static let retryDelay: TimeInterval = 5.0
     private static let maxRetries = 3
     
@@ -22,12 +24,16 @@ public final class SlackMonitoringService: ObservableObject {
     private var monitoringTask: Task<Void, Never>?
     private var currentRetryCount = 0
     private var contentParsingEnabled = false
+    private var backgroundMonitoringEnabled = true
+    private var lastMonitoringState: MonitoringState?
+    private var currentPollInterval: TimeInterval = pollIntervalActive
     
     // MARK: - Components
     private let appObserver = SlackAppObserver()
     private let accessibilityManager = AccessibilityManager.shared
     private let slackParser = SlackUIParser.shared
     private let vectorService = ProductionService.shared
+    private let cleanupService = DatabaseCleanupService.shared
     
     // MARK: - Public Interface
     
@@ -46,6 +52,13 @@ public final class SlackMonitoringService: ObservableObject {
         do {
             try await vectorService.initialize()
             print("✅ Vector database initialized for Slack ingestion")
+            
+            // Initialize cleanup service for Slack database management
+            if let database = vectorService.getDatabase() as? SlackDatabaseSchema {
+                cleanupService.setDatabase(database)
+                cleanupService.startPeriodicCleanup()
+                print("✅ Database cleanup service started (2-month retention)")
+            }
         } catch {
             print("⚠️ Vector database initialization failed: \(error)")
             print("   Monitoring will continue but data won't be persisted")
@@ -65,6 +78,9 @@ public final class SlackMonitoringService: ObservableObject {
         isMonitoring = true
         currentRetryCount = 0
         
+        // Load saved state
+        loadMonitoringState()
+        
         monitoringTask = Task {
             await monitorSlackActivity()
         }
@@ -79,6 +95,12 @@ public final class SlackMonitoringService: ObservableObject {
         
         print("Stopping Slack monitoring service")
         isMonitoring = false
+        saveMonitoringState()
+        
+        // Stop cleanup service
+        cleanupService.stopPeriodicCleanup()
+        print("✅ Database cleanup service stopped")
+        
         monitoringTask?.cancel()
         monitoringTask = nil
         currentRetryCount = 0
@@ -105,7 +127,10 @@ public final class SlackMonitoringService: ObservableObject {
             slackPID: slackState?.pid ?? 0,
             slackName: slackState?.name ?? "N/A",
             retryCount: currentRetryCount,
-            contentParsingEnabled: contentParsingEnabled
+            contentParsingEnabled: contentParsingEnabled,
+            cleanupEnabled: cleanupService.cleanupEnabled,
+            lastCleanupDate: cleanupService.lastCleanupDate,
+            retentionPeriod: cleanupService.getRetentionDescription()
         )
     }
     
@@ -127,6 +152,50 @@ public final class SlackMonitoringService: ObservableObject {
         print("📋 Extracted content history cleared")
     }
     
+    /// Enable or disable background monitoring
+    public func setBackgroundMonitoringEnabled(_ enabled: Bool) {
+        backgroundMonitoringEnabled = enabled
+        print("Background monitoring \(enabled ? "enabled" : "disabled")")
+        saveMonitoringState()
+    }
+    
+    /// Get current background monitoring status
+    public var isBackgroundMonitoringEnabled: Bool {
+        return backgroundMonitoringEnabled
+    }
+    
+    /// Save monitoring state for persistence
+    private func saveMonitoringState() {
+        let state = MonitoringState(
+            isMonitoring: isMonitoring,
+            backgroundMonitoringEnabled: backgroundMonitoringEnabled,
+            contentParsingEnabled: contentParsingEnabled,
+            lastExtractedTimestamp: lastExtractedConversation?.messages.last?.timestamp,
+            extractionHistoryCount: extractionHistory.count
+        )
+        
+        if let encoded = try? JSONEncoder().encode(state) {
+            UserDefaults.standard.set(encoded, forKey: "SlunkMonitoringState")
+        }
+    }
+    
+    /// Load monitoring state from persistence
+    private func loadMonitoringState() {
+        guard let data = UserDefaults.standard.data(forKey: "SlunkMonitoringState"),
+              let state = try? JSONDecoder().decode(MonitoringState.self, from: data) else {
+            return
+        }
+        
+        backgroundMonitoringEnabled = state.backgroundMonitoringEnabled
+        contentParsingEnabled = state.contentParsingEnabled
+        lastMonitoringState = state
+        
+        print("💾 Loaded monitoring state:")
+        print("   Background monitoring: \(state.backgroundMonitoringEnabled)")
+        print("   Content parsing: \(state.contentParsingEnabled)")
+        print("   Last extraction: \(state.lastExtractedTimestamp?.description ?? "none")")
+    }
+    
     // MARK: - Private Implementation
     
     private func monitorSlackActivity() async {
@@ -135,7 +204,7 @@ public final class SlackMonitoringService: ObservableObject {
         while isMonitoring && !Task.isCancelled {
             do {
                 await processMonitoringCycle()
-                try await Task.sleep(for: .seconds(Self.pollInterval))
+                try await Task.sleep(for: .seconds(currentPollInterval))
                 
             } catch {
                 await handleMonitoringError(error)
@@ -151,6 +220,7 @@ public final class SlackMonitoringService: ObservableObject {
                 print("✅ SLACK DETECTED! Slack is active and ready for monitoring")
                 print("   📊 PID: \(slackState.pid), Name: \(slackState.name)")
                 currentRetryCount = 0 // Reset retry count on successful detection
+                currentPollInterval = Self.pollIntervalActive // Use fast polling when active
                 
                 // Phase 3: Content parsing when Slack is active
                 if contentParsingEnabled {
@@ -159,7 +229,19 @@ public final class SlackMonitoringService: ObservableObject {
                     print("   ℹ️ Content parsing disabled (accessibility permissions needed)")
                 }
             } else {
-                // Slack is running but not in focus - no logging needed for normal operation
+                // Slack is running but not in focus
+                if backgroundMonitoringEnabled {
+                    print("🟡 Slack is running but not in focus - continuing background monitoring")
+                    currentPollInterval = Self.pollIntervalBackground
+                    
+                    // Still attempt content extraction in background mode
+                    if contentParsingEnabled {
+                        await attemptContentExtraction(from: slackState)
+                    }
+                } else {
+                    print("⏸️ Slack not in focus - background monitoring disabled")
+                    currentPollInterval = Self.pollIntervalInactive
+                }
             }
         } else {
             print("🔍 Scanning for Slack... (not currently running)")
@@ -249,6 +331,9 @@ public final class SlackMonitoringService: ObservableObject {
             // Log successful content extraction
             print("   🎯 UI UPDATE: Sending \(conversation.messages.count) messages to UI")
             
+            // Save state after successful extraction
+            self.saveMonitoringState()
+            
             // Keep only last 10 extractions to avoid memory bloat
             if extractionHistory.count > 10 {
                 extractionHistory.removeFirst()
@@ -264,6 +349,8 @@ public final class SlackMonitoringService: ObservableObject {
     /// Ingest Slack conversation into vector database
     private func ingestConversationToVectorStore(_ conversation: SlackConversation) async {
         do {
+            // Track ingestion session for continuity
+            let sessionId = UUID().uuidString
             // Create a summary of the conversation for vector storage
             let conversationText = conversation.messages.map { message in
                 "[\(message.sender)] \(message.content)"
@@ -289,6 +376,11 @@ public final class SlackMonitoringService: ObservableObject {
             print("      ID: \(result.summaryId)")
             print("      Keywords: \(result.extractedKeywords.joined(separator: ", "))")
             print("      Processing time: \(String(format: "%.2f", result.processingTime))s")
+            
+            // Log ingestion checkpoint for resume capability
+            UserDefaults.standard.set(Date(), forKey: "SlunkLastIngestionTime")
+            UserDefaults.standard.set(conversation.workspace, forKey: "SlunkLastIngestionWorkspace")
+            UserDefaults.standard.set(conversation.channel, forKey: "SlunkLastIngestionChannel")
             
         } catch {
             print("   ❌ Vector database ingestion failed: \(error.localizedDescription)")
@@ -385,6 +477,9 @@ public struct ServiceStatus: Codable {
     public let slackName: String
     public let retryCount: Int
     public let contentParsingEnabled: Bool
+    public let cleanupEnabled: Bool
+    public let lastCleanupDate: Date?
+    public let retentionPeriod: String
     public let timestamp: Date
     
     public init(
@@ -394,7 +489,10 @@ public struct ServiceStatus: Codable {
         slackPID: pid_t,
         slackName: String,
         retryCount: Int,
-        contentParsingEnabled: Bool = false
+        contentParsingEnabled: Bool = false,
+        cleanupEnabled: Bool = true,
+        lastCleanupDate: Date? = nil,
+        retentionPeriod: String = "2 months"
     ) {
         self.isMonitoring = isMonitoring
         self.slackRunning = slackRunning
@@ -403,22 +501,40 @@ public struct ServiceStatus: Codable {
         self.slackName = slackName
         self.retryCount = retryCount
         self.contentParsingEnabled = contentParsingEnabled
+        self.cleanupEnabled = cleanupEnabled
+        self.lastCleanupDate = lastCleanupDate
+        self.retentionPeriod = retentionPeriod
         self.timestamp = Date()
     }
     
     public var description: String {
+        let cleanupDateStr = lastCleanupDate?.formatted() ?? "Never"
         return """
         Slack Monitoring Status:
         - Monitoring: \(isMonitoring ? "Active" : "Inactive")
         - Slack Running: \(slackRunning ? "Yes" : "No")
         - Slack Active: \(slackActive ? "Yes" : "No")
         - Content Parsing: \(contentParsingEnabled ? "Enabled" : "Disabled")
+        - Database Cleanup: \(cleanupEnabled ? "Enabled" : "Disabled")
+        - Retention Period: \(retentionPeriod)
+        - Last Cleanup: \(cleanupDateStr)
         - PID: \(slackPID)
         - App Name: \(slackName)
         - Retry Count: \(retryCount)
         - Last Updated: \(timestamp)
         """
     }
+}
+
+// MARK: - Monitoring State Persistence
+
+struct MonitoringState: Codable {
+    let isMonitoring: Bool
+    let backgroundMonitoringEnabled: Bool
+    let contentParsingEnabled: Bool
+    let lastExtractedTimestamp: Date?
+    let extractionHistoryCount: Int
+    let savedAt: Date = Date()
 }
 
 // MARK: - Health Check Support

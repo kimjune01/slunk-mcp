@@ -16,6 +16,7 @@ class ProductionService: ObservableObject {
     private var smartIngestion: SmartIngestionService?
     private var dataSeeder: DataSeeder?
     private var maintenanceTimer: Timer?
+    private var cleanupService: DatabaseCleanupService?
     
     private init() {}
     
@@ -54,6 +55,12 @@ class ProductionService: ObservableObject {
             
             dataSeeder = DataSeeder()
             await dataSeeder?.setDatabase(schema)
+            
+            // Initialize cleanup service for Slack database
+            // Note: We'll need to check if we're working with Slack data and create appropriate schema
+            cleanupService = DatabaseCleanupService.shared
+            // TODO: Integrate cleanup service when SlackDatabaseSchema is available
+            Logger.shared.logDatabaseOperation("Database cleanup service configured")
             
             // Seed initial data if needed
             if FeatureFlags.isDataSeedingEnabled && !UserDefaultsManager.shared.onboardingCompleted {
@@ -266,6 +273,9 @@ class ProductionService: ObservableObject {
     
     deinit {
         maintenanceTimer?.invalidate()
+        Task { @MainActor in
+            cleanupService?.stopPeriodicCleanup()
+        }
     }
 }
 
@@ -343,20 +353,7 @@ extension ProductionService {
                     "processingTime": ingestionResult.processingTime,
                     "embeddingDimensions": ingestionResult.embeddingDimensions
                 ]
-                
-            case "getConversationStats":
-                guard let schema = schema else {
-                    throw SlunkError.resourceNotFound("Database not available")
-                }
-                
-                let totalCount = try await schema.getTotalSummaryCount()
-                
-                result = [
-                    "totalConversations": totalCount,
-                    "databaseSize": statistics?.formattedDatabaseSize ?? "Unknown",
-                    "lastUpdated": ISO8601DateFormatter().string(from: Date())
-                ]
-                
+            
             default:
                 throw SlunkError.invalidInput("Unknown method: \(method)")
             }
