@@ -42,18 +42,37 @@ slunk/
 1. **Build the app:**
    ```bash
    cd slunk-swift
-   xcodebuild -project slunk-swift.xcodeproj -scheme slunk-swift build
+   xcodebuild -project slunk-swift.xcodeproj -scheme slunk-swift -configuration Release build
    ```
 
-2. **Run the app:**
+2. **Run the app (GUI Mode):**
    ```bash
    open /path/to/slunk-swift.app
    ```
+   The app will appear in your menu bar with a # icon.
 
-3. **Configure Claude Desktop:**
-   - Click "Copy Config" button in the app
-   - Add the configuration to `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Restart Claude Desktop
+3. **Configure Claude Desktop (MCP Server Mode):**
+   Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+   ```json
+   {
+     "mcpServers": {
+       "slunk-swift": {
+         "command": "/path/to/slunk-swift.app/Contents/MacOS/slunk-swift",
+         "args": ["--mcp"]
+       }
+     }
+   }
+   ```
+   Then restart Claude Desktop.
+
+## Running Modes
+
+Slunk runs in two distinct modes:
+
+- **GUI Mode** (default): Menu bar app with real-time Slack monitoring
+- **MCP Server Mode** (`--mcp` flag): JSON-RPC server for Claude integration
+
+Both modes share the same SQLite database, so the GUI app populates data that the MCP server queries.
 
 ## MCP Tools
 
@@ -81,6 +100,7 @@ The 9 MCP tools provide comprehensive Slack search capabilities:
 ## Architecture
 
 - **Swift + SwiftUI** - Native macOS application
+- **Dual-Mode Design** - GUI app for monitoring, MCP server for queries
 - **SQLiteVec** - Vector database for semantic search
 - **GRDB** - SQLite toolkit with custom configuration  
 - **Accessibility API** - Real-time Slack UI monitoring
