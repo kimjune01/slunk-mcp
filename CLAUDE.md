@@ -78,6 +78,24 @@ xcodebuild test -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift
   - `ingestion_log`: Session tracking and statistics
 - **Message Deduplication**: SHA256 content hashing prevents duplicates while tracking edits
 
+#### Contextual Search Architecture (Phase 1)
+- **SlackQueryService**: Actor-based search service with comprehensive filtering
+  - Location: `slunk-swift/slunk-swift/Database/SlackQueryService.swift`
+  - **QueryFilter system**: Channel, user, time range, message type, reactions, attachments
+  - **SearchMode options**: Semantic (vector similarity), structured (SQL), hybrid (combined)
+  - **Result types**: Message, contextual message, structured, conversation chunk
+  - **SearchMetadata**: Tracks result counts, context enhancement, and search performance
+- **MessageContextualizer**: Context enhancement and conversation analysis
+  - Location: `slunk-swift/slunk-swift/Services/MessageContextualizer.swift`
+  - **ThreadContext extraction**: Captures thread hierarchy and recent message flow
+  - **ConversationChunk creation**: Groups related messages by time windows and topic shifts
+  - **Short message interpretation**: Provides context for emoji, "LGTM", "+1", etc.
+  - **Channel context mapping**: Maps channels to topics for enhanced meaning
+- **Enhanced EmbeddingService**: Async vector generation with error handling
+  - **512-dimensional vectors**: Uses Apple's NLEmbedding for semantic similarity
+  - **Async API**: `generateEmbedding(for:) async throws -> [Float]`
+  - **Input validation**: Rejects empty/whitespace text with proper error messages
+
 ### Project Configuration
 - Python dependencies managed by `uv` (see `pyproject.toml` and `uv.lock`)
 - MCP server integration configured in `claude-config.json`
@@ -109,11 +127,17 @@ The MCP server is designed to be consumed by Claude Desktop or other MCP clients
 6. **Message Deduplication**: SHA256-based content hashing with edit tracking
 7. **UI Management**: SwiftUI interface for server control and monitoring
 8. **Test Suite**: Comprehensive testing for all components
+9. **Phase 1 Contextual Search**: Complete contextual semantic search infrastructure
+   - **SlackQueryService**: Actor-based search with filtering and result management
+   - **MessageContextualizer**: Thread context enhancement and conversation chunking
+   - **Enhanced EmbeddingService**: Async API with 512-dimensional NLEmbedding vectors
+   - **Contextual meaning extraction**: Solves short message problem (emoji, "LGTM", etc.)
+   - **Multi-mode search**: Semantic, structured, and hybrid search capabilities
 
 ### 🚧 In Development
-- Structured query tools for filtered message retrieval
-- Advanced semantic search capabilities
-- Time-based query helpers
+- **Phase 2**: MCP tools for Slack querying (`search_messages`, `get_thread_context`)
+- **Phase 3**: Advanced query parsing and natural language interface
+- Time-based query helpers and conversation analytics
 
 ### 🔧 Manual Testing
 

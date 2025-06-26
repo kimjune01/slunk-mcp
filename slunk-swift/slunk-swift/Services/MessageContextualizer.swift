@@ -45,8 +45,41 @@ public struct ConversationChunk {
     }
 }
 
+/// Context enhancement service for Slack messages, solving the short message problem.
+///
+/// MessageContextualizer transforms short, ambiguous messages (like emoji and abbreviations) 
+/// into contextually meaningful text before embedding generation. This dramatically improves
+/// semantic search accuracy for typical Slack conversations.
+///
+/// Core Capabilities:
+/// - **Thread Context Enhancement**: Builds meaning from conversation history
+/// - **Short Message Interpretation**: Translates emoji and abbreviations with context
+/// - **Channel Context Mapping**: Applies topic-specific meaning to messages
+/// - **Conversation Chunking**: Groups related messages for improved search
+///
+/// Example Transformations:
+/// - "👍" in deployment thread → "deployment approval confirmation"
+/// - "LGTM" in code review → "code review approval - looks good to me"
+/// - "🚨" in incident channel → "urgent incident alert requiring attention"
 public actor MessageContextualizer {
     private let embeddingService: EmbeddingService
+    
+    // MARK: - Configuration Constants
+    
+    /// Time window for grouping related messages into conversation chunks
+    private static let defaultChunkTimeWindow: TimeInterval = 600 // 10 minutes
+    
+    /// Maximum number of messages per conversation chunk
+    private static let maxChunkSize = 20
+    
+    /// Character threshold for considering a message "short" and needing context enhancement
+    private static let shortMessageThreshold = 10
+    
+    /// Minimum keyword length for topic extraction
+    private static let minKeywordLength = 2
+    
+    /// Time threshold for "recent" context (1 hour)
+    private static let recentTimeThreshold: TimeInterval = 3600
     
     public init(embeddingService: EmbeddingService) {
         self.embeddingService = embeddingService
@@ -119,10 +152,10 @@ public actor MessageContextualizer {
         let now = Date()
         let timeDiff = now.timeIntervalSince(timestamp)
         
-        if timeDiff < 3600 { // Less than 1 hour
+        if timeDiff < Self.recentTimeThreshold {
             return "Recent message (\(Int(timeDiff / 60)) minutes ago)"
         } else if timeDiff < 86400 { // Less than 1 day
-            return "Today (\(Int(timeDiff / 3600)) hours ago)"
+            return "Today (\(Int(timeDiff / Self.recentTimeThreshold)) hours ago)"
         } else if timeDiff < 604800 { // Less than 1 week
             return "This week (\(Int(timeDiff / 86400)) days ago)"
         } else {
@@ -169,8 +202,8 @@ public actor MessageContextualizer {
             return true
         }
         
-        // Check for very short messages (less than 10 characters)
-        return cleanContent.count < 10
+        // Check for very short messages
+        return cleanContent.count < Self.shortMessageThreshold
     }
     
     private func interpretShortResponse(
@@ -243,7 +276,7 @@ public actor MessageContextualizer {
     
     public func createConversationChunks(
         from messages: [SlackMessage], 
-        timeWindow: TimeInterval = 600 // 10 minutes
+        timeWindow: TimeInterval = Self.defaultChunkTimeWindow
     ) async -> [ConversationChunk] {
         let sortedMessages = messages.sorted { $0.timestamp < $1.timestamp }
         var chunks: [ConversationChunk] = []
@@ -301,7 +334,7 @@ public actor MessageContextualizer {
         }
         
         // Size-based chunking: limit chunk size
-        return currentChunk.count >= 20
+        return currentChunk.count >= Self.maxChunkSize
     }
     
     private func createChunk(from messages: [SlackMessage]) -> ConversationChunk {
@@ -369,7 +402,7 @@ public actor MessageContextualizer {
         
         // Remove common words and return top keywords
         let stopWords = Set(["the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by"])
-        let meaningfulKeywords = keywords.filter { !stopWords.contains($0) && $0.count > 2 }
+        let meaningfulKeywords = keywords.filter { !stopWords.contains($0) && $0.count > Self.minKeywordLength }
         
         return Array(Set(meaningfulKeywords)).sorted()
     }

@@ -1,8 +1,17 @@
 import Foundation
 
-// Simplified SlackQueryService for Phase 1 verification
-// Contains core types and basic query structure without GRDB complexity
-
+/// Contextual search service for Slack messages with comprehensive filtering and result management.
+/// 
+/// SlackQueryService provides the core infrastructure for semantic and structured search across
+/// Slack conversations, with support for context enhancement, conversation chunking, and 
+/// multi-mode search capabilities.
+///
+/// Key Features:
+/// - Context-enhanced search for short messages (emoji, abbreviations)
+/// - Thread-aware search with conversation history
+/// - Multiple search modes: semantic, structured, hybrid
+/// - Comprehensive filtering: channels, users, time ranges, reactions
+/// - Actor-based thread safety for concurrent operations
 public actor SlackQueryService {
     private let messageContextualizer: MessageContextualizer
     
