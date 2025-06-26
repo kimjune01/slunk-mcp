@@ -46,11 +46,11 @@ final class ProductionIntegrationTests: XCTestCase {
         print("\n🌱 Testing data seeding...")
         let seedResult = try await dataSeeder.seedIfEmpty()
         
-        print("  ✓ Seeded \(seedResult.conversationsAdded) conversations")
-        print("  ✓ Total keywords: \(seedResult.totalKeywords)")
-        print("  ✓ Time taken: \(String(format: "%.2f", seedResult.timeTaken))s")
+        print("  ✓ Seeded \(seedResult.itemsSeeded) conversations")
+        print("  ✓ Seeding completed: \(seedResult.wasSeeded)")
+        print("  ✓ Time taken: \(String(format: "%.2f", seedResult.processingTime))s")
         
-        XCTAssertGreaterThan(seedResult.conversationsAdded, 0, "Should seed initial data")
+        XCTAssertGreaterThan(seedResult.itemsSeeded, 0, "Should seed initial data")
         
         // Test real-world queries
         print("\n🔍 Testing production queries...")
@@ -239,13 +239,20 @@ final class ProductionIntegrationTests: XCTestCase {
             ("database optimization", 10)
         ]
         
+        let mcpServer = MCPServer()
+        mcpServer.setDatabase(schema)
+        
         for (query, limit) in searchTests {
-            let results = try await MCPServer.searchConversations(
-                query: query,
-                limit: limit,
-                schema: schema,
-                queryEngine: queryEngine
+            let request = MCPRequest(
+                method: "searchConversations",
+                params: [
+                    "query": query,
+                    "limit": limit
+                ]
             )
+            
+            let response = await mcpServer.handleRequest(request)
+            let results = response.result?.value as? [[String: Any]] ?? []
             
             print("  Query: '\(query)' (limit: \(limit))")
             print("  Results: \(results.count)")
@@ -281,13 +288,18 @@ final class ProductionIntegrationTests: XCTestCase {
         ]
         
         for ingestion in testIngestions {
-            let result = try await MCPServer.ingestText(
-                content: ingestion.content,
-                title: ingestion.title,
-                summary: ingestion.summary,
-                sender: ingestion.sender,
-                smartIngestion: smartIngestion
+            let request = MCPRequest(
+                method: "ingestText",
+                params: [
+                    "content": ingestion.content,
+                    "title": ingestion.title,
+                    "summary": ingestion.summary,
+                    "sender": ingestion.sender
+                ]
             )
+            
+            let response = await mcpServer.handleRequest(request)
+            let result = response.result?.value as? [String: Any] ?? [:]
             
             print("  Ingested: '\(ingestion.title)'")
             print("    ID: \(result["id"] ?? "No ID")")
@@ -301,7 +313,13 @@ final class ProductionIntegrationTests: XCTestCase {
         // Test getConversationStats tool
         print("\n📊 Testing getConversationStats MCP tool...")
         
-        let stats = try await MCPServer.getConversationStats(schema: schema)
+        let statsRequest = MCPRequest(
+            method: "getConversationStats",
+            params: [:]
+        )
+        
+        let statsResponse = await mcpServer.handleRequest(statsRequest)
+        let stats = statsResponse.result?.value as? [String: Any] ?? [:]
         
         print("  Total conversations: \(stats["totalConversations"] ?? 0)")
         print("  Unique senders: \(stats["uniqueSenders"] ?? 0)")
@@ -321,12 +339,16 @@ final class ProductionIntegrationTests: XCTestCase {
         // Verify new content is searchable
         print("\n🔄 Verifying new content is searchable...")
         
-        let newResults = try await MCPServer.searchConversations(
-            query: "SwiftUI performance caching",
-            limit: 5,
-            schema: schema,
-            queryEngine: queryEngine
+        let newResultsRequest = MCPRequest(
+            method: "searchConversations",
+            params: [
+                "query": "SwiftUI performance caching",
+                "limit": 5
+            ]
         )
+        
+        let newResultsResponse = await mcpServer.handleRequest(newResultsRequest)
+        let newResults = newResultsResponse.result?.value as? [[String: Any]] ?? []
         
         let hasNewContent = newResults.contains { result in
             (result["title"] as? String)?.contains("SwiftUI") == true ||

@@ -675,7 +675,7 @@ class MCPServer {
     
     // MARK: - Phase 2 MCP Tool Handlers
     
-    private func handleSearchMessages(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+    internal func handleSearchMessages(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
         guard let query = arguments["query"] as? String else {
             return JSONRPCResponse(
                 result: nil,
@@ -749,7 +749,7 @@ class MCPServer {
         return JSONRPCResponse(result: result, error: nil, id: id)
     }
     
-    private func handleGetThreadContext(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+    internal func handleGetThreadContext(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
         guard let threadId = arguments["thread_id"] as? String else {
             return JSONRPCResponse(
                 result: nil,
@@ -782,7 +782,7 @@ class MCPServer {
         return JSONRPCResponse(result: result, error: nil, id: id)
     }
     
-    private func handleGetMessageContext(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+    internal func handleGetMessageContext(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
         guard let messageId = arguments["message_id"] as? String else {
             return JSONRPCResponse(
                 result: nil,
@@ -820,7 +820,7 @@ class MCPServer {
         return JSONRPCResponse(result: result, error: nil, id: id)
     }
     
-    private func handleAnalyzeConversation(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+    internal func handleAnalyzeConversation(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
         let messageIds = arguments["messages"] as? [String] ?? []
         let conversationId = arguments["conversation_id"] as? String
         let analysisType = arguments["analysis_type"] as? String ?? "summary"
