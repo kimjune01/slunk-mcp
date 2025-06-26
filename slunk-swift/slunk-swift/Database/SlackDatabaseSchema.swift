@@ -635,9 +635,72 @@ public class SlackDatabaseSchema {
             }
         }
     }
+    
+    // MARK: - Vector Embedding Operations
+    
+    /// Store a vector embedding for a message (placeholder - not implemented)
+    public func insertEmbedding(messageId: String, embedding: [Float]) async throws {
+        // TODO: Implement proper vector embedding storage with SQLiteVec
+        Logger.shared.logDatabaseOperation("Vector embedding insert not yet implemented for messageId: \(messageId)")
+    }
+    
+    /// Get vector embedding for a message (placeholder - not implemented)
+    public func getEmbedding(messageId: String) async throws -> [Float]? {
+        // TODO: Implement proper vector embedding retrieval with SQLiteVec
+        Logger.shared.logDatabaseOperation("Vector embedding get not yet implemented for messageId: \(messageId)")
+        return nil
+    }
+    
+    /// Perform semantic search using vector similarity (placeholder - not implemented)
+    public func semanticSearch(embedding: [Float], limit: Int = 10) async throws -> [VectorSearchResult] {
+        // TODO: Implement proper vector search with SQLiteVec
+        Logger.shared.logDatabaseOperation("Vector semantic search not yet implemented")
+        return []
+    }
+    
+    /// Hybrid search combining semantic and keyword search (simplified to keyword search for now)
+    public func hybridSearch(
+        query: String,
+        embedding: [Float],
+        channels: [String]? = nil,
+        users: [String]? = nil,
+        limit: Int = 10
+    ) async throws -> [SlackMessageWithWorkspace] {
+        // TODO: Implement semantic search component when vector embedding is ready
+        // For now, just perform keyword search
+        return try await searchMessages(query: query, channels: channels, users: users, limit: limit)
+    }
+    
+    // Keep the original code commented for future implementation
+    private func hybridSearchOriginal(
+        query: String,
+        embedding: [Float],
+        channels: [String]? = nil,
+        users: [String]? = nil,
+        limit: Int = 10
+    ) async throws -> [SlackMessageWithWorkspace] {
+        guard let db = database else {
+            throw SlackDatabaseError.databaseNotOpen
+        }
+        
+        return try await db.read { db in
+            // TODO: Implement vector embedding integration here
+            return []
+        }
+    }
 }
 
 // MARK: - Supporting Types
+
+public struct VectorSearchResult {
+    public let messageId: String
+    public let distance: Double
+    
+    public init(messageId: String, distance: Double) {
+        self.messageId = messageId
+        self.distance = distance
+    }
+}
 
 enum DeduplicationResult {
     case new(String)              // Message ID

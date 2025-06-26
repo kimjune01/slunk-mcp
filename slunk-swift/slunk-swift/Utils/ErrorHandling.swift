@@ -216,44 +216,5 @@ struct SafeOperation {
 }
 
 // MARK: - Production Extensions
-
-extension SmartIngestionService {
-    func safeIngestText(
-        content: String,
-        title: String,
-        summary: String,
-        sender: String? = nil,
-        timestamp: Date? = nil
-    ) async throws -> IngestionResult {
-        try await SafeOperation.perform(context: "SmartIngestion") {
-            let sanitizedContent = try InputSanitizer.validateInput(content)
-            let sanitizedTitle = try InputSanitizer.validateInput(title, maxLength: 500)
-            let sanitizedSummary = try InputSanitizer.validateInput(summary, maxLength: 5000)
-            
-            return try await self.ingestText(
-                content: sanitizedContent,
-                title: sanitizedTitle,
-                summary: sanitizedSummary,
-                sender: sender,
-                timestamp: timestamp
-            )
-        }
-    }
-}
-
-extension NaturalLanguageQueryEngine {
-    func safeExecuteHybridSearch(
-        _ query: ParsedQuery,
-        limit: Int = 10
-    ) async throws -> [QueryResult] {
-        try await SafeOperation.perform(context: "QueryEngine") {
-            guard limit > 0 && limit <= 100 else {
-                throw SlunkError.invalidInput("Limit must be between 1 and 100")
-            }
-            
-            return try await RetryHandler.retry {
-                try await self.executeHybridSearch(query, limit: limit)
-            }
-        }
-    }
-}
+// Extensions for SmartIngestionService and NaturalLanguageQueryEngine removed 
+// as these services have been consolidated into SlackDatabaseSchema

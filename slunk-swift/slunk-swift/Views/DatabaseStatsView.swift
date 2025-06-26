@@ -33,17 +33,17 @@ private struct StatsContentView: View {
     
     var body: some View {
         HStack(spacing: 15) {
-            StatItem(label: "Messages", value: "\(stats.messageCount)")
+            StatItem(label: "Messages", value: "\(stats.tableStatistics["slack_messages"]?.rowCount ?? 0)")
             
             Divider()
                 .frame(height: 12)
             
-            StatItem(label: "Workspaces", value: "\(stats.workspaceCount)")
+            StatItem(label: "Tables", value: "\(stats.tableStatistics.count)")
             
             Divider()
                 .frame(height: 12)
             
-            StatItem(label: "Size", value: stats.databaseSize)
+            StatItem(label: "Size", value: formatBytes(stats.totalSize))
             
             Spacer()
             
@@ -61,6 +61,12 @@ private struct StatsContentView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
         return formatter.string(from: date)
+    }
+    
+    private func formatBytes(_ bytes: UInt64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(bytes))
     }
 }
 

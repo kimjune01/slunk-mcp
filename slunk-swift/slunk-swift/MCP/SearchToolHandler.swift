@@ -4,7 +4,7 @@ import Foundation
 
 class SearchToolHandler: BaseMCPToolHandler {
     
-    private let queryEngine: NaturalLanguageQueryEngine?
+    private let database: SlackDatabaseSchema?
     private let queryService: SlackQueryService?
     private let messageContextualizer: MessageContextualizer?
     
@@ -17,8 +17,8 @@ class SearchToolHandler: BaseMCPToolHandler {
         }
     }
     
-    init(queryEngine: NaturalLanguageQueryEngine?, queryService: SlackQueryService?, messageContextualizer: MessageContextualizer?) {
-        self.queryEngine = queryEngine
+    init(database: SlackDatabaseSchema?, queryService: SlackQueryService?, messageContextualizer: MessageContextualizer?) {
+        self.database = database
         self.queryService = queryService
         self.messageContextualizer = messageContextualizer
     }
@@ -35,10 +35,10 @@ class SearchToolHandler: BaseMCPToolHandler {
     // MARK: - Search Conversations Tool
     
     func handleSearchConversations(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
-        guard let queryEngine = queryEngine else {
+        guard let database = database else {
             return createError(
                 code: -32603,
-                message: "Search service temporarily unavailable. The query engine is not initialized. This usually resolves within a few seconds after app startup. Please try again in a moment, or check if the Slack monitoring service is running.",
+                message: "Search service temporarily unavailable. The database is not initialized. This usually resolves within a few seconds after app startup. Please try again in a moment, or check if the Slack monitoring service is running.",
                 id: id
             )
         }
@@ -54,18 +54,21 @@ class SearchToolHandler: BaseMCPToolHandler {
         let limit = extractIntParameter("limit", from: arguments, defaultValue: 10) ?? 10
         
         do {
-            let parsedQuery = queryEngine.parseQuery(query)
-            let results = try await queryEngine.executeHybridSearch(parsedQuery, limit: limit)
+            // Use direct database search for now (basic keyword search)
+            let results = try await database.searchMessages(
+                query: query,
+                limit: limit
+            )
             
             let searchResults = results.map { result in
                 [
-                    "id": result.summary.id.uuidString,
-                    "title": result.summary.title,
-                    "summary": result.summary.summary,
-                    "sender": result.summary.sender ?? "Unknown",
-                    "timestamp": ISO8601DateFormatter().string(from: result.summary.timestamp),
-                    "score": result.combinedScore,
-                    "matchedKeywords": result.matchedKeywords
+                    "id": result.message.id,
+                    "title": "Message from \(result.message.sender)",
+                    "summary": String(result.message.content.prefix(200)),
+                    "sender": result.message.sender,
+                    "timestamp": ISO8601DateFormatter().string(from: result.message.timestamp),
+                    "channel": result.message.channel,
+                    "workspace": result.workspace
                 ] as [String: Any]
             }
             
@@ -83,7 +86,7 @@ class SearchToolHandler: BaseMCPToolHandler {
         } catch {
             return createError(
                 code: -32603,
-                message: "Search failed: \(error.localizedDescription). Try simplifying your query, using different keywords, or try the 'conversational_search' tool for complex queries. If the error persists, the search service may need time to initialize.",
+                message: "Search failed: \(error.localizedDescription). Try simplifying your query, using different keywords, or try the 'search_messages' tool for more specific searches. If the error persists, the search service may need time to initialize.",
                 id: id
             )
         }

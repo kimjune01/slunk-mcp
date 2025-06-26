@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var serverManager = ServerManager()
-    @State private var databaseStats: DatabaseStats?
+    @State private var databaseStats: ContentViewDatabaseStats?
     @State private var showingQuitConfirmation = false
     
     var buildConfiguration: String {
@@ -103,7 +103,7 @@ struct ContentView: View {
                 ErrorLogger.shared.log(error, context: "ContentView.refreshDatabaseStats")
                 // Set fallback stats on error
                 await MainActor.run {
-                    self.databaseStats = DatabaseStats(
+                    self.databaseStats = ContentViewDatabaseStats(
                         messageCount: 0,
                         workspaceCount: 0,
                         databaseSize: "Unknown",
@@ -134,12 +134,12 @@ struct ContentView: View {
         }
     }
     
-    private func getDatabaseStatistics() async throws -> DatabaseStats {
+    private func getDatabaseStatistics() async throws -> ContentViewDatabaseStats {
         let vectorService = ProductionService.shared
         
         // Check if service is initialized, if not return empty stats
         guard vectorService.isInitialized else {
-            return DatabaseStats(
+            return ContentViewDatabaseStats(
                 messageCount: 0,
                 workspaceCount: 0,
                 databaseSize: "0 KB",
@@ -148,7 +148,7 @@ struct ContentView: View {
         }
         
         guard let database = vectorService.getDatabase() as? SlackDatabaseSchema else {
-            return DatabaseStats(
+            return ContentViewDatabaseStats(
                 messageCount: 0,
                 workspaceCount: 0,
                 databaseSize: "0 KB",
@@ -160,7 +160,7 @@ struct ContentView: View {
         let workspaceCount = try await database.getWorkspaceCount()
         let databaseSize = try await database.getDatabaseSize()
         
-        return DatabaseStats(
+        return ContentViewDatabaseStats(
             messageCount: messageCount,
             workspaceCount: workspaceCount,
             databaseSize: formatBytes(databaseSize),
@@ -176,7 +176,7 @@ struct ContentView: View {
     }
 }
 
-struct DatabaseStats {
+struct ContentViewDatabaseStats {
     let messageCount: Int
     let workspaceCount: Int
     let databaseSize: String
@@ -303,7 +303,7 @@ struct MCPConfigCard: View {
 }
 
 struct DatabaseStatsCard: View {
-    let stats: DatabaseStats?
+    let stats: ContentViewDatabaseStats?
     let onRefresh: () -> Void
     
     var body: some View {

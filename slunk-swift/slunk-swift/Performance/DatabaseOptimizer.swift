@@ -1,12 +1,12 @@
 import Foundation
-import SQLiteVec
+import GRDB
 
-/// Database optimization and performance tuning utilities
+/// Database optimization and performance tuning utilities for Slack database
 class DatabaseOptimizer {
     
     // MARK: - Optimization Application
     
-    func applyOptimizations(to schema: SQLiteVecSchema) async throws {
+    func applyOptimizations(to schema: SlackDatabaseSchema) async throws {
         guard let database = schema.database else {
             throw DatabaseOptimizerError.databaseNotAvailable
         }
@@ -38,12 +38,14 @@ class DatabaseOptimizer {
             "PRAGMA automatic_index = ON"
         ]
         
-        for pragma in optimizations {
-            try await database.execute(pragma)
+        try await database.write { db in
+            for pragma in optimizations {
+                try db.execute(sql: pragma)
+            }
         }
     }
     
-    func getCurrentSettings(from schema: SQLiteVecSchema) async throws -> [String: String] {
+    func getCurrentSettings(from schema: SlackDatabaseSchema) async throws -> [String: String] {
         guard let database = schema.database else {
             throw DatabaseOptimizerError.databaseNotAvailable
         }
@@ -60,13 +62,15 @@ class DatabaseOptimizer {
         
         var results: [String: String] = [:]
         
-        for setting in settings {
-            let query = "PRAGMA \(setting)"
-            let rows = try await database.query(query)
-            
-            if let row = rows.first,
-               let value = row[setting] {
-                results[setting] = String(describing: value)
+        try await database.read { db in
+            for setting in settings {
+                let query = "PRAGMA \(setting)"
+                do {
+                    let value = try String.fetchOne(db, sql: query) ?? "unknown"
+                    results[setting] = value
+                } catch {
+                    results[setting] = "error"
+                }
             }
         }
         
@@ -78,54 +82,62 @@ class DatabaseOptimizer {
     
     // MARK: - Database Maintenance
     
-    func performVacuum(on schema: SQLiteVecSchema) async throws {
+    func performVacuum(on schema: SlackDatabaseSchema) async throws {
         guard let database = schema.database else {
             throw DatabaseOptimizerError.databaseNotAvailable
         }
         
         // VACUUM reclaims unused space and defragments the database
-        try await database.execute("VACUUM")
+        try await database.write { db in
+            try db.execute(sql: "VACUUM")
+        }
     }
     
-    func performAnalyze(on schema: SQLiteVecSchema) async throws {
+    func performAnalyze(on schema: SlackDatabaseSchema) async throws {
         guard let database = schema.database else {
             throw DatabaseOptimizerError.databaseNotAvailable
         }
         
         // ANALYZE updates statistics for the query optimizer
-        try await database.execute("ANALYZE")
+        try await database.write { db in
+            try db.execute(sql: "ANALYZE")
+        }
     }
     
-    func optimizeIndexes(on schema: SQLiteVecSchema) async throws {
+    func optimizeIndexes(on schema: SlackDatabaseSchema) async throws {
         guard let database = schema.database else {
             throw DatabaseOptimizerError.databaseNotAvailable
         }
         
-        // Create optimized indexes for common query patterns
+        // Create optimized indexes for Slack message queries
         let indexQueries = [
             // Temporal queries
-            "CREATE INDEX IF NOT EXISTS idx_summaries_timestamp ON text_summaries(timestamp)",
+            "CREATE INDEX IF NOT EXISTS idx_messages_timestamp_opt ON slack_messages(timestamp DESC)",
             
-            // Sender queries  
-            "CREATE INDEX IF NOT EXISTS idx_summaries_sender ON text_summaries(sender)",
+            // Channel + timestamp composite for efficient channel browsing
+            "CREATE INDEX IF NOT EXISTS idx_messages_channel_timestamp ON slack_messages(workspace, channel, timestamp DESC)",
             
-            // Composite index for temporal + sender queries
-            "CREATE INDEX IF NOT EXISTS idx_summaries_timestamp_sender ON text_summaries(timestamp, sender)",
+            // Sender + timestamp for user activity queries
+            "CREATE INDEX IF NOT EXISTS idx_messages_sender_timestamp ON slack_messages(sender, timestamp DESC)",
             
-            // Keywords JSON index (if supported)
-            "CREATE INDEX IF NOT EXISTS idx_summaries_keywords ON text_summaries(keywords)",
+            // Thread optimization
+            "CREATE INDEX IF NOT EXISTS idx_messages_thread_timestamp ON slack_messages(thread_ts, timestamp ASC)",
             
-            // Title and summary text indexes for keyword searches
-            "CREATE INDEX IF NOT EXISTS idx_summaries_title ON text_summaries(title)",
-            "CREATE INDEX IF NOT EXISTS idx_summaries_summary ON text_summaries(summary)"
+            // Content hash for deduplication queries
+            "CREATE INDEX IF NOT EXISTS idx_messages_content_hash_workspace ON slack_messages(content_hash, workspace)",
+            
+            // Full-text search index
+            "CREATE INDEX IF NOT EXISTS idx_messages_content_text ON slack_messages(content)"
         ]
         
-        for indexQuery in indexQueries {
-            do {
-                try await database.execute(indexQuery)
-            } catch {
-                // Some indexes might already exist or not be supported
-                print("Index creation skipped: \(error.localizedDescription)")
+        try await database.write { db in
+            for indexQuery in indexQueries {
+                do {
+                    try db.execute(sql: indexQuery)
+                    Logger.shared.logDatabaseOperation("Created index: \(indexQuery)")
+                } catch {
+                    Logger.shared.logDatabaseError(error, context: "DatabaseOptimizer.optimizeIndexes")
+                }
             }
         }
     }
@@ -172,31 +184,19 @@ enum MemoryPressure {
 
 // MARK: - Database Extensions
 
-extension SQLiteVecSchema {
-    func getDatabaseSize() async throws -> UInt64 {
-        guard let database = database else {
-            throw DatabaseOptimizerError.databaseNotAvailable
-        }
-        
-        let query = "SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()"
-        let rows = try await database.query(query)
-        
-        if let row = rows.first,
-           let size = row["size"] as? Int64 {
-            return UInt64(size)
-        }
-        
-        return 0
-    }
-    
+extension SlackDatabaseSchema {
     func clearAllData() async throws {
         guard let database = database else {
             throw DatabaseOptimizerError.databaseNotAvailable
         }
         
         // Clear all tables while preserving schema
-        try await database.execute("DELETE FROM text_summaries")
-        try await database.execute("DELETE FROM summary_embeddings")
+        try await database.write { db in
+            try db.execute(sql: "DELETE FROM slack_messages")
+            try db.execute(sql: "DELETE FROM slack_reactions")
+            try db.execute(sql: "DELETE FROM slack_message_embeddings")
+            try db.execute(sql: "DELETE FROM ingestion_log")
+        }
     }
     
     func getTableStatistics() async throws -> [String: TableStatistics] {
@@ -204,24 +204,24 @@ extension SQLiteVecSchema {
             throw DatabaseOptimizerError.databaseNotAvailable
         }
         
-        var stats: [String: TableStatistics] = [:]
-        
-        let tables = ["text_summaries", "summary_embeddings"]
-        
-        for table in tables {
-            let countQuery = "SELECT COUNT(*) as count FROM \(table)"
-            let countRows = try await database.query(countQuery)
+        return try await database.read { db in
+            var stats: [String: TableStatistics] = [:]
             
-            let count = countRows.first?["count"] as? Int ?? 0
+            let tables = ["slack_messages", "slack_reactions", "slack_message_embeddings", "ingestion_log"]
             
-            stats[table] = TableStatistics(
-                name: table,
-                rowCount: count,
-                estimatedSize: count * 1000 // Rough estimate
-            )
+            for table in tables {
+                let countQuery = "SELECT COUNT(*) as count FROM \(table)"
+                let count = try Int.fetchOne(db, sql: countQuery) ?? 0
+                
+                stats[table] = TableStatistics(
+                    name: table,
+                    rowCount: count,
+                    estimatedSize: count * 1000 // Rough estimate
+                )
+            }
+            
+            return stats
         }
-        
-        return stats
     }
 }
 
