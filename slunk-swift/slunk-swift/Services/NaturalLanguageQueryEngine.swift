@@ -130,8 +130,8 @@ class NaturalLanguageQueryEngine {
         limit: Int
     ) async throws -> [QueryResult] {
         
-        // First, get semantic similarity results
-        let vectorResults = try await database.searchSimilarVectors(queryEmbedding, limit: limit * 2)
+        // First, get semantic similarity results using cosine similarity
+        let vectorResults = try await database.searchSimilarVectorsCosine(queryEmbedding, limit: limit * 2)
         
         // Then get keyword matches if we have keywords
         var keywordMatches: [TextSummary] = []

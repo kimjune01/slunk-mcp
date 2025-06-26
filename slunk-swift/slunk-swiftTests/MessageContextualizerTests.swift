@@ -55,11 +55,23 @@ final class MessageContextualizerTests: XCTestCase {
         let engineeringMessage = SlackMessage(
             timestamp: Date(),
             sender: "dev",
-            content: "test"
+            content: "test",
+            channel: "engineering"
         )
         
         let enhancedContent = await contextualizer.enhanceWithChannelContext(message: engineeringMessage)
-        XCTAssertTrue(enhancedContent.contains("Team discussions"))
+        XCTAssertTrue(enhancedContent.contains("Software development and technical discussions"))
+        
+        // Test default channel topic
+        let defaultMessage = SlackMessage(
+            timestamp: Date(),
+            sender: "dev",
+            content: "test",
+            channel: "unknown-channel"
+        )
+        
+        let defaultContent = await contextualizer.enhanceWithChannelContext(message: defaultMessage)
+        XCTAssertTrue(defaultContent.contains("Team discussions in #unknown-channel"))
     }
     
     // MARK: - Contextual Meaning Tests

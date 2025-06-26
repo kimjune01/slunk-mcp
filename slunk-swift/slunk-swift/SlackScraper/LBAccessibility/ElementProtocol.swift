@@ -45,14 +45,16 @@ public struct Element: ElementProtocol, Encodable {
     /// - Parameter processIdentifier: Process identifier of the application.
     public init(processIdentifier: pid_t) {
         element = AXUIElementCreateApplication(processIdentifier)
-        try? self.setTimeout(seconds: 5)
+        let timeoutSeconds: Float = Self.isSandboxed() ? 30.0 : 5.0
+        try? self.setTimeout(seconds: timeoutSeconds)
     }
 
     /// Wraps a ``AXUIElement``.
     /// - Parameter element: Legacy accessibility element to wrap.
     init(axUIElement element: AXUIElement) {
         self.element = element
-        try? self.setTimeout(seconds: 5)
+        let timeoutSeconds: Float = Self.isSandboxed() ? 30.0 : 5.0
+        try? self.setTimeout(seconds: timeoutSeconds)
     }
 
     /// Attempts to initialize from a legacy accessibility value.
@@ -231,6 +233,12 @@ public extension Element {
 
     /// Maximum number of characters to fetch for a value
     static var maxValueCount: Int = 1_000_000
+    
+    /// Check if the application is running in a sandbox environment
+    private static func isSandboxed() -> Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["APP_SANDBOX_CONTAINER_ID"] != nil
+    }
 
     /// Safely fetches contents of this element, respecting maximum count limits
     /// - Returns: Array of content elements, or nil if count exceeds limits or errors occur

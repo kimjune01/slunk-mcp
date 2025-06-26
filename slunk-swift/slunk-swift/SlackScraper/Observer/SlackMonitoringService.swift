@@ -298,7 +298,7 @@ public final class SlackMonitoringService: ObservableObject {
             // Try to parse current conversation
             if let conversation = try await slackParser.parseCurrentConversation(
                 from: slackApplication,
-                timeout: 10.0 // Short timeout for real-time monitoring
+                timeout: 30.0 // Increased timeout for sandbox compatibility
             ) {
                 await handleExtractedContent(conversation)
             } else {
@@ -464,6 +464,12 @@ public actor SlackAppObserver {
     /// Get all running applications (for debugging)
     public func getAllRunningApps() -> [AppState] {
         return NSWorkspace.shared.runningApplications.map { AppState(runningApplication: $0) }
+    }
+    
+    /// Check if the application is running in a sandbox environment
+    private func isSandboxed() -> Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["APP_SANDBOX_CONTAINER_ID"] != nil
     }
 }
 

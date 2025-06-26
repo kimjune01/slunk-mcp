@@ -301,14 +301,46 @@ class MCPServer {
     }
     
     private func handleToolsList(_ request: JSONRPCRequest) -> JSONRPCResponse {
+        // Tool Selection Guide for LLM Agents
+        let toolSelectionGuide = """
+        SLACK SEARCH TOOL SELECTION GUIDE:
+        
+        QUICK DECISION TREE:
+        • Simple queries ("find X", "show me Y") → searchConversations
+        • Need specific filters (channels, users, dates) → search_messages  
+        • Complex/multi-part queries → intelligent_search
+        • Following up previous search → conversational_search
+        • Understanding cryptic messages → get_message_context
+        • Analyzing trends/patterns → discover_patterns
+        
+        COMMON QUERY PATTERNS:
+        • "What did [person] say about [topic]?" → search_messages (user filter)
+        • "Catch me up on [channel]" → search_messages (channel + recent dates)
+        • "Find decisions about [topic]" → intelligent_search (understands decision language)
+        • "What's been discussed lately?" → discover_patterns (time_range="week")
+        • "I don't understand this message" → get_message_context
+        
+        SEARCH STRATEGY FOR NO/TOO MANY RESULTS:
+        1. Start broad with searchConversations
+        2. If >50 results → search_messages with filters
+        3. If 0 results → intelligent_search with expanded keywords
+        4. Use suggest_related to find adjacent topics
+        
+        RESULT INTERPRETATION:
+        • Scores >0.8 = highly relevant
+        • Scores 0.5-0.8 = somewhat relevant  
+        • Scores <0.5 = loosely related
+        • Empty results = try broader keywords or longer time range
+        """
+        
         let tools: [[String: Any]] = [
             [
                 "name": "searchConversations",
-                "description": "Search conversations using natural language queries with semantic similarity, keyword matching, and temporal filtering",
+                "description": "Search through Slack conversations using natural language. Finds relevant messages and conversations based on meaning, keywords, people mentioned, and time periods. Use this when you need to find specific discussions, topics, or information from Slack history. Examples: 'Find discussions about iOS development from last week' or 'Show conversations with Alice about project deadlines'.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "query": ["type": "string", "description": "Natural language search query (e.g., 'Swift meetings with Alice from last week')"],
+                        "query": ["type": "string", "description": "Your search in plain English. Be natural and specific. Examples: 'Swift meetings with Alice from last week', 'bug reports about login issues', 'decisions made in #product channel this month'"],
                         "limit": ["type": "integer", "description": "Maximum number of results to return", "default": 10]
                     ],
                     "required": ["query"]
@@ -317,15 +349,15 @@ class MCPServer {
             // Phase 2: Contextual Search Tools
             [
                 "name": "search_messages",
-                "description": "Advanced contextual search for Slack messages with filtering and context enhancement",
+                "description": "Advanced Slack message search with precise filtering options. Use this for detailed queries with specific constraints like channel names, user names, date ranges, or search modes. Better than searchConversations when you need exact filtering. Examples: 'Search for messages in #engineering channel from user John between March 1-15' or 'Find messages containing API mentions using semantic search mode'.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "query": ["type": "string", "description": "Search query (semantic, keyword, or natural language)"],
-                        "channels": ["type": "array", "items": ["type": "string"], "description": "Filter by specific channels"],
-                        "users": ["type": "array", "items": ["type": "string"], "description": "Filter by specific users"],
-                        "start_date": ["type": "string", "description": "Start date (ISO 8601)"],
-                        "end_date": ["type": "string", "description": "End date (ISO 8601)"],
+                        "query": ["type": "string", "description": "What you want to search for. Can be keywords, phrases, or natural language. Examples: 'API documentation', 'server down', 'team meeting notes'"],
+                        "channels": ["type": "array", "items": ["type": "string"], "description": "Filter by specific channels. Format: ['#engineering', 'general'] or ['engineering', 'general'] (# optional)"],
+                        "users": ["type": "array", "items": ["type": "string"], "description": "Filter by specific users. Format: ['@alice', 'bob'] or ['alice', 'bob'] (@ optional)"],
+                        "start_date": ["type": "string", "description": "Start date in ISO 8601 format. Examples: '2024-03-15', '2024-03-15T14:30:00Z', or relative like 'last week'"],
+                        "end_date": ["type": "string", "description": "End date in ISO 8601 format. Examples: '2024-03-20', '2024-03-20T18:00:00Z', or 'now'"],
                         "search_mode": ["type": "string", "enum": ["semantic", "structured", "hybrid"], "default": "hybrid"],
                         "limit": ["type": "integer", "default": 10, "minimum": 1, "maximum": 100]
                     ],
@@ -372,7 +404,7 @@ class MCPServer {
             ],
             [
                 "name": "intelligent_search",
-                "description": "Advanced search combining natural language understanding with contextual search",
+                "description": "The most advanced search tool that combines natural language processing with smart contextual understanding. Automatically parses your query, understands intent, and executes the best search strategy. Use this for complex, multi-faceted queries or when other search tools aren't sufficient. Perfect for questions involving decisions, opinions, conclusions, or cause-and-effect relationships. Example: 'Find technical discussions that led to decisions about the mobile app architecture changes'. WORKFLOW TIP: Use after simpler searches fail or for analytical queries.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
@@ -386,7 +418,7 @@ class MCPServer {
             ],
             [
                 "name": "discover_patterns",
-                "description": "Discover conversation patterns and recurring themes",
+                "description": "Analyze Slack data to find recurring topics, communication patterns, and trends over time. Discovers who talks about what, when people are most active, and what topics come up frequently. Use for insights about team communication, popular discussion topics, or activity patterns. Perfect for questions like 'What has the team been focused on?', 'Who are the most active contributors?', or 'When do people typically discuss technical issues?'. ANALYTICS TIP: Great starting point for understanding team dynamics before diving into specific searches.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
@@ -398,7 +430,7 @@ class MCPServer {
             ],
             [
                 "name": "suggest_related",
-                "description": "Suggest related conversations based on current query or context",
+                "description": "Find conversations and messages related to your current search or specific messages. Uses semantic similarity to suggest content you might be interested in based on what you're currently looking at. Use after finding something interesting to discover related discussions, follow-up conversations, or similar topics. Perfect for questions like 'What else was discussed about this topic?' or 'Were there any follow-ups to this decision?'. CHAINING TIP: Use after any search tool to explore related content or find conversation threads that continue the topic.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
@@ -411,7 +443,7 @@ class MCPServer {
             ],
             [
                 "name": "conversational_search",
-                "description": "Multi-turn conversational search with context awareness and refinement",
+                "description": "Conduct an ongoing search conversation where each query builds on previous ones. Maintains session context across multiple searches, allowing you to refine, narrow, or expand your search iteratively. Use for exploratory search sessions where you want to progressively drill down or explore a topic. Example workflow: 1) Start with 'mobile app bugs' 2) Refine to 'iOS crashes' 3) Further refine to 'crashes in authentication module'. CHAINING TIP: Perfect for follow-up questions like 'show me more recent ones' or 'now filter by user John'.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
@@ -434,7 +466,47 @@ class MCPServer {
             ]
         ]
         
-        return JSONRPCResponse(result: ["tools": tools], error: nil, id: request.id)
+        // Tool Chaining Examples for Complex Workflows
+        let toolChainExamples = """
+        
+        TOOL CHAINING WORKFLOWS:
+        
+        COMPLEX ANALYSIS WORKFLOW:
+        Query: "Find technical discussions that led to the API redesign decision"
+        1. parse_natural_query → extract intent and keywords
+        2. intelligent_search → find relevant discussions  
+        3. suggest_related → find follow-up conversations
+        4. get_thread_context → get full decision threads
+        
+        EXPLORATORY SEARCH WORKFLOW:
+        Query: "What's been happening with the mobile team?"
+        1. discover_patterns → identify recent topics and active people
+        2. search_messages → filter by identified people/topics
+        3. conversational_search → drill down into specific areas
+        4. suggest_related → find related discussions
+        
+        TROUBLESHOOTING WORKFLOW:
+        Query: "Help me understand this error message"
+        1. get_message_context → understand the cryptic message
+        2. search_messages → find similar error reports
+        3. get_thread_context → see full conversation around the error
+        4. suggest_related → find solution discussions
+        
+        CATCH-UP WORKFLOW:
+        Query: "What did I miss in #engineering this week?"
+        1. search_messages → filter by channel and date range
+        2. discover_patterns → identify main topics discussed
+        3. intelligent_search → find key decisions or conclusions
+        4. suggest_related → find related discussions in other channels
+        """
+        
+        let response: [String: Any] = [
+            "tools": tools,
+            "toolSelectionGuide": toolSelectionGuide,
+            "toolChainExamples": toolChainExamples
+        ]
+        
+        return JSONRPCResponse(result: response, error: nil, id: request.id)
     }
     
     private func handleToolCall(_ request: JSONRPCRequest) async -> JSONRPCResponse {
@@ -483,7 +555,7 @@ class MCPServer {
         default:
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32601, message: "Unknown tool: \(name)"),
+                error: JSONRPCError(code: -32601, message: "Unknown tool: '\(name)'. Available tools: searchConversations, search_messages, get_thread_context, get_message_context, parse_natural_query, intelligent_search, discover_patterns, suggest_related, conversational_search. Use 'tools/list' to see full descriptions and parameters."),
                 id: request.id
             )
         }
@@ -511,6 +583,47 @@ class MCPServer {
         fflush(stderr)
     }
     
+    // MARK: - Enhanced Error Handling
+    
+    private func createHelpfulError(code: Int, message: String, suggestions: [String] = [], alternatives: [String] = []) -> JSONRPCError {
+        var fullMessage = message
+        
+        if !suggestions.isEmpty {
+            fullMessage += "\n\nSUGGESTIONS:\n" + suggestions.map { "• \($0)" }.joined(separator: "\n")
+        }
+        
+        if !alternatives.isEmpty {
+            fullMessage += "\n\nALTERNATIVES:\n" + alternatives.map { "• \($0)" }.joined(separator: "\n")
+        }
+        
+        return JSONRPCError(code: code, message: fullMessage)
+    }
+    
+    private func createEmptyResultsGuidance(query: String, toolName: String) -> [String: Any] {
+        return [
+            "results": [],
+            "resultCount": 0,
+            "query": query,
+            "emptyResultsGuidance": [
+                "possibleReasons": [
+                    "Query too specific - try broader keywords",
+                    "Time range too narrow - expand date range", 
+                    "No data for specified filters (channel/user)",
+                    "Search service still indexing recent messages"
+                ],
+                "suggestions": [
+                    "Try simpler keywords or synonyms",
+                    "Use 'intelligent_search' for complex queries",
+                    "Check spelling of channel/user names",
+                    "Try 'discover_patterns' to see what topics exist"
+                ],
+                "alternativeTools": toolName == "searchConversations" ? 
+                    ["search_messages (with filters)", "intelligent_search", "discover_patterns"] :
+                    ["searchConversations (simpler)", "intelligent_search", "discover_patterns"]
+            ]
+        ]
+    }
+    
     // MARK: - Enhanced MCP Tool Handlers
     
     func handleSearchConversations(_ request: MCPRequest) async -> JSONRPCResponse {
@@ -518,7 +631,7 @@ class MCPServer {
               let queryEngine = queryEngine else {
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32603, message: "Database not available"),
+                error: JSONRPCError(code: -32603, message: "Search service temporarily unavailable. The database or query engine is not initialized. This usually resolves within a few seconds after app startup. Please try again in a moment, or check if the Slack monitoring service is running."),
                 id: JSONRPCId.string(request.id)
             )
         }
@@ -526,7 +639,7 @@ class MCPServer {
         guard let query = request.params["query"] as? String else {
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32602, message: "Missing required parameter: query"),
+                error: JSONRPCError(code: -32602, message: "Missing required parameter 'query'. Please provide a search query string. Example: {\"query\": \"Swift discussions with Alice from last week\"}. The query should be in natural language describing what you want to find."),
                 id: JSONRPCId.string(request.id)
             )
         }
@@ -549,8 +662,13 @@ class MCPServer {
                 ] as [String: Any]
             }
             
+            // Provide helpful guidance for empty results
+            let result: Any = searchResults.isEmpty ? 
+                createEmptyResultsGuidance(query: query, toolName: "searchConversations") :
+                searchResults
+            
             return JSONRPCResponse(
-                result: searchResults,
+                result: result,
                 error: nil,
                 id: JSONRPCId.string(request.id)
             )
@@ -558,7 +676,7 @@ class MCPServer {
         } catch {
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32603, message: "Search failed: \(error.localizedDescription)"),
+                error: JSONRPCError(code: -32603, message: "Search failed: \(error.localizedDescription). Try simplifying your query, using different keywords, or try the 'intelligent_search' tool for complex queries. If the error persists, the search service may need time to initialize."),
                 id: JSONRPCId.string(request.id)
             )
         }
@@ -625,7 +743,7 @@ class MCPServer {
         guard let query = arguments["query"] as? String else {
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32602, message: "Missing required parameter: query"),
+                error: JSONRPCError(code: -32602, message: "Missing required parameter 'query'. For search_messages, provide: {\"query\": \"your search terms\", \"channels\": [\"#channel1\"], \"users\": [\"@username\"], \"start_date\": \"2024-03-15\"}. Use this tool when you need specific filtering by channel, user, or date."),
                 id: id
             )
         }
@@ -634,18 +752,61 @@ class MCPServer {
         guard database != nil else {
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32603, message: "Database not available"),
+                error: JSONRPCError(code: -32603, message: "Search database not ready. Try 'searchConversations' for basic search, or wait a moment for the service to initialize. The database typically becomes available within 10-15 seconds of app startup."),
                 id: id
             )
         }
         
-        // Extract parameters
+        // Extract and validate parameters
         let channels = arguments["channels"] as? [String] ?? []
         let users = arguments["users"] as? [String] ?? []
-        let startDate = (arguments["start_date"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }
-        let endDate = (arguments["end_date"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }
+        
+        // Validate date parameters
+        var startDate: Date?
+        var endDate: Date?
+        
+        if let startDateStr = arguments["start_date"] as? String {
+            startDate = ISO8601DateFormatter().date(from: startDateStr)
+            if startDate == nil {
+                return JSONRPCResponse(
+                    result: nil,
+                    error: JSONRPCError(code: -32602, message: "Invalid 'start_date' format '\(startDateStr)'. Use ISO 8601 format like '2024-03-15' or '2024-03-15T14:30:00Z'. For relative dates, try using 'intelligent_search' which understands 'last week', 'yesterday', etc."),
+                    id: id
+                )
+            }
+        }
+        
+        if let endDateStr = arguments["end_date"] as? String {
+            endDate = ISO8601DateFormatter().date(from: endDateStr)
+            if endDate == nil {
+                return JSONRPCResponse(
+                    result: nil,
+                    error: JSONRPCError(code: -32602, message: "Invalid 'end_date' format '\(endDateStr)'. Use ISO 8601 format like '2024-03-20' or '2024-03-20T18:00:00Z'. For relative dates, try using 'intelligent_search' which understands 'now', 'today', etc."),
+                    id: id
+                )
+            }
+        }
+        
         let searchModeStr = arguments["search_mode"] as? String ?? "hybrid"
         let limit = arguments["limit"] as? Int ?? 10
+        
+        // Validate search mode
+        if !["semantic", "structured", "hybrid"].contains(searchModeStr) {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32602, message: "Invalid 'search_mode' '\(searchModeStr)'. Valid options are: 'semantic' (finds similar meaning), 'structured' (exact keyword matching), 'hybrid' (combines both, recommended)."),
+                id: id
+            )
+        }
+        
+        // Validate limit
+        if limit < 1 || limit > 100 {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32602, message: "Invalid 'limit' \(limit). Must be between 1 and 100. Use smaller values (5-20) for focused results, larger values (50-100) for comprehensive searches."),
+                id: id
+            )
+        }
         
         // Parse search mode (for future use)
         let _ = {
@@ -699,7 +860,7 @@ class MCPServer {
         guard let threadId = arguments["thread_id"] as? String else {
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32602, message: "Missing required parameter: thread_id"),
+                error: JSONRPCError(code: -32602, message: "Missing required parameter 'thread_id'. Provide the Slack thread timestamp ID like: {\"thread_id\": \"ts_1234567890.123456\"}. Thread IDs can be found in search results or by examining Slack URLs. If you don't have a thread ID, try using 'search_messages' to find relevant conversations first."),
                 id: id
             )
         }
@@ -943,7 +1104,18 @@ class MCPServer {
         if referenceMessages.isEmpty && queryContext == nil {
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32602, message: "Must provide either 'reference_messages' or 'query_context'"),
+                error: createHelpfulError(
+                    code: -32602,
+                    message: "Must provide either 'reference_messages' or 'query_context' parameter.",
+                    suggestions: [
+                        "Use {\"query_context\": \"topic description\"} to find related discussions",
+                        "Use {\"reference_messages\": [\"msg_id1\", \"msg_id2\"]} to find similar messages"
+                    ],
+                    alternatives: [
+                        "Try 'intelligent_search' for complex topic discovery",
+                        "Use 'search_messages' first to find specific messages, then suggest_related"
+                    ]
+                ),
                 id: id
             )
         }

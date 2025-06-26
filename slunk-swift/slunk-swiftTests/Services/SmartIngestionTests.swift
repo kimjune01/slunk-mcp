@@ -44,7 +44,7 @@ final class SmartIngestionTests: XCTestCase {
             try? FileManager.default.removeItem(at: tempURL)
         }
         
-        let schema = try SQLiteVecSchema(databasePath: tempURL.path)
+        let schema = SQLiteVecSchema()
         try await schema.initializeDatabase()
         await service.setDatabase(schema)
         
@@ -96,7 +96,7 @@ final class SmartIngestionTests: XCTestCase {
             try? FileManager.default.removeItem(at: tempURL)
         }
         
-        let schema = try SQLiteVecSchema(databasePath: tempURL.path)
+        let schema = SQLiteVecSchema()
         try await schema.initializeDatabase()
         await service.setDatabase(schema)
         
@@ -173,7 +173,7 @@ final class SmartIngestionTests: XCTestCase {
             try? FileManager.default.removeItem(at: tempURL)
         }
         
-        let schema = try SQLiteVecSchema(databasePath: tempURL.path)
+        let schema = SQLiteVecSchema()
         try await schema.initializeDatabase()
         await service.setDatabase(schema)
         

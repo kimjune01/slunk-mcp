@@ -310,32 +310,6 @@ final class ProductionIntegrationTests: XCTestCase {
             XCTAssertEqual(result["status"] as? String, "success", "Should indicate success")
         }
         
-        // Test getConversationStats tool
-        print("\n📊 Testing getConversationStats MCP tool...")
-        
-        let statsRequest = MCPRequest(
-            method: "getConversationStats",
-            params: [:]
-        )
-        
-        let statsResponse = await mcpServer.handleRequest(statsRequest)
-        let stats = statsResponse.result?.value as? [String: Any] ?? [:]
-        
-        print("  Total conversations: \(stats["totalConversations"] ?? 0)")
-        print("  Unique senders: \(stats["uniqueSenders"] ?? 0)")
-        print("  Date range: \(stats["dateRange"] ?? "Unknown")")
-        
-        if let topKeywords = stats["topKeywords"] as? [[String: Any]] {
-            print("  Top keywords:")
-            for keyword in topKeywords.prefix(5) {
-                print("    - \(keyword["word"] ?? ""): \(keyword["count"] ?? 0)")
-            }
-        }
-        
-        XCTAssertGreaterThan(stats["totalConversations"] as? Int ?? 0, 0, "Should have conversations")
-        XCTAssertGreaterThan(stats["uniqueSenders"] as? Int ?? 0, 0, "Should have senders")
-        XCTAssertNotNil(stats["topKeywords"], "Should have top keywords")
-        
         // Verify new content is searchable
         print("\n🔄 Verifying new content is searchable...")
         

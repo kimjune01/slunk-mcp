@@ -8,7 +8,7 @@ public actor SlackUIParser {
     public static let shared = SlackUIParser()
     
     // MARK: - Configuration
-    public static let parseTimeout: TimeInterval = 30.0
+    public static let parseTimeout: TimeInterval = 60.0 // Increased for sandbox compatibility
     private static let maxElementsPerParse = 500
     private static let retryAttempts = 2
     
@@ -182,5 +182,11 @@ public extension SlackUIParser {
         print("  Title: \(title ?? "nil")")
         print("  Description: \(description ?? "nil")")
         print("  Children: \(children?.count ?? 0)")
+    }
+    
+    /// Check if the application is running in a sandbox environment
+    private static func isSandboxed() -> Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["APP_SANDBOX_CONTAINER_ID"] != nil
     }
 }
