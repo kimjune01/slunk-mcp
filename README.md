@@ -9,23 +9,26 @@ Slunk is a macOS application that extracts Slack conversations and provides sema
 ## Key Features
 
 - **🔍 Real-time Slack monitoring** with complete conversation capture (including threads)
-- **🧠 Semantic search** using 512-dimensional vector embeddings  
-- **🤖 MCP server integration** for Claude Desktop
+- **🧠 Contextual semantic search** using 512-dimensional vector embeddings with context enhancement
+- **🎯 Short message interpretation** - Transforms emoji and abbreviations into meaningful context
+- **🤖 MCP server integration** for Claude Desktop  
 - **⚡ High performance** with <200ms query latency
 - **🛡️ Production-ready** with comprehensive error handling and logging
+- **🔄 Thread-aware search** with conversation chunking and topic detection
 
 ## Project Structure
 
 ```
 slunk/
-├── slunk-swift/                 # Main Swift macOS application
-│   ├── README.md               # Detailed usage and setup guide
-│   ├── PRODUCTION_README.md    # Production deployment guide  
-│   ├── IMPLEMENTATION_COMPLETE.md # Complete implementation overview
-│   └── slunk-swift/            # Swift source code
-├── research/                   # Research and analysis documents
-├── scraper/                    # Reference implementations and utilities
-└── Tests/                      # Additional test resources
+├── slunk-swift/                           # Main Swift macOS application
+│   ├── CONTEXTUAL_SEARCH_STATUS.md       # Phase 1 implementation status
+│   ├── VECTOR_DATABASE_IMPLEMENTATION_COMPLETE.md # Vector DB implementation
+│   └── slunk-swift/                       # Swift source code
+│       ├── Database/                      # SQLiteVec + contextual search
+│       ├── Services/                      # Core services (embedding, contextualizer)
+│       └── SlackScraper/                  # Slack monitoring and parsing
+├── CLAUDE.md                              # Development guide and architecture
+└── vector-strategy.md                     # Vector search strategy
 ```
 
 ## Quick Setup

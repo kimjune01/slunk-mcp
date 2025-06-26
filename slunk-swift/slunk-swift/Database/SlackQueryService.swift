@@ -22,18 +22,20 @@ public actor SlackQueryService {
     // MARK: - Basic Query Filters
     
     public func filterByChannels(_ channels: [String]) -> QueryFilter {
+        let placeholders = Array(repeating: "?", count: channels.count).joined(separator: ",")
         return QueryFilter(
             type: .channel,
             values: channels,
-            sqlFragment: "channel IN (\(channels.map { "'\($0)'" }.joined(separator: ",")))"
+            sqlFragment: "channel IN (\(placeholders))"
         )
     }
     
     public func filterByUsers(_ users: [String]) -> QueryFilter {
+        let placeholders = Array(repeating: "?", count: users.count).joined(separator: ",")
         return QueryFilter(
             type: .user,
             values: users,
-            sqlFragment: "sender IN (\(users.map { "'\($0)'" }.joined(separator: ",")))"
+            sqlFragment: "sender IN (\(placeholders))"
         )
     }
     
@@ -41,7 +43,7 @@ public actor SlackQueryService {
         return QueryFilter(
             type: .timeRange,
             values: [startDate.timeIntervalSince1970.description, endDate.timeIntervalSince1970.description],
-            sqlFragment: "timestamp BETWEEN \(startDate.timeIntervalSince1970) AND \(endDate.timeIntervalSince1970)"
+            sqlFragment: "timestamp BETWEEN ? AND ?"
         )
     }
     

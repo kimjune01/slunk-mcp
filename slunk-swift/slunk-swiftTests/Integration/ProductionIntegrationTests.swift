@@ -483,8 +483,4 @@ final class ProductionIntegrationTests: XCTestCase {
 
 // MARK: - Test Helpers
 
-extension String {
-    static func *(left: String, right: Int) -> String {
-        return String(repeating: left, count: right)
-    }
-}
+// String multiplication operator removed to avoid conflicts

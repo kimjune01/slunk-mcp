@@ -17,6 +17,33 @@ class ServerManager: ObservableObject {
     func start() {
         guard !isRunning else { return }
         
+        // Initialize vector database and connect to MCP server
+        Task {
+            do {
+                let productionService = await ProductionService.shared
+                try await productionService.initialize()
+                
+                // Get the database from the production service
+                if let database = await productionService.getDatabase() {
+                    await MainActor.run {
+                        addLog("✅ Vector database initialized")
+                    }
+                    mcpServer?.setDatabase(database)
+                    await MainActor.run {
+                        addLog("✅ Vector database connected to MCP server")
+                    }
+                } else {
+                    await MainActor.run {
+                        addLog("⚠️ Could not retrieve database from production service")
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    addLog("⚠️ Vector database initialization failed: \(error)")
+                }
+            }
+        }
+        
         mcpServer?.start()
         isRunning = true
         

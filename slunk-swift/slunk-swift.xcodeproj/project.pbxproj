@@ -35,7 +35,6 @@
 		0ECDE8AE2E0AEE1F0020E1EB /* slunk-swiftTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "slunk-swiftTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0ECDE8B82E0AEE1F0020E1EB /* slunk-swiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "slunk-swiftUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0ECDE8DE2E0B1D1C0020E1EB /* GRDBCustomSQLite-USER.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "GRDBCustomSQLite-USER.xcconfig"; sourceTree = "<group>"; };
-		0ECDE8DF2E0B1D2D0020E1EB /* GRDBCustomSQLite-USER.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "GRDBCustomSQLite-USER.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -85,6 +84,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0E9B7C7A2E0CA0EE006DF883 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				0ECDE8DE2E0B1D1C0020E1EB /* GRDBCustomSQLite-USER.xcconfig */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		0ECDE8972E0AEE1E0020E1EB = {
 			isa = PBXGroup;
 			children = (
@@ -93,6 +100,7 @@
 				0ECDE8BB2E0AEE1F0020E1EB /* slunk-swiftUITests */,
 				0ECDE8D12E0B136C0020E1EB /* Frameworks */,
 				0ECDE8A12E0AEE1E0020E1EB /* Products */,
+				0E9B7C7A2E0CA0EE006DF883 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -627,14 +635,6 @@
 				minimumVersion = 1.5.0;
 			};
 		};
-		0ECDE8DB2E0B1CEA0020E1EB /* XCRemoteSwiftPackageReference "CSQLite" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sbooth/CSQLite.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.47.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -657,11 +657,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0ECDE8D82E0B1BCA0020E1EB /* XCRemoteSwiftPackageReference "swifter" */;
 			productName = Swifter;
-		};
-		0ECDE8DC2E0B1CFB0020E1EB /* CSQLite */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 0ECDE8DB2E0B1CEA0020E1EB /* XCRemoteSwiftPackageReference "CSQLite" */;
-			productName = CSQLite;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -265,8 +265,4 @@ final class PerformanceOptimizationTests: XCTestCase {
 
 // MARK: - Supporting Types
 
-extension String {
-    static func *(left: String, right: Int) -> String {
-        return String(repeating: left, count: right)
-    }
-}
+// String multiplication operator removed to avoid conflicts

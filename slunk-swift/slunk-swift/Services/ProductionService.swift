@@ -79,6 +79,10 @@ class ProductionService: ObservableObject {
     
     // MARK: - Public Methods
     
+    func getDatabase() -> SQLiteVecSchema? {
+        return schema
+    }
+    
     func search(query: String) async throws -> [QueryResult] {
         guard isInitialized else {
             throw SlunkError.databaseInitializationFailed("Service not initialized")

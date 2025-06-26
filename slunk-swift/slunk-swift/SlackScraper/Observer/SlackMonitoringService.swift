@@ -27,6 +27,7 @@ public final class SlackMonitoringService: ObservableObject {
     private let appObserver = SlackAppObserver()
     private let accessibilityManager = AccessibilityManager.shared
     private let slackParser = SlackUIParser.shared
+    private let vectorService = ProductionService.shared
     
     // MARK: - Public Interface
     
@@ -40,6 +41,15 @@ public final class SlackMonitoringService: ObservableObject {
         }
         
         print("ℹ️ Starting Slack monitoring service")
+        
+        // Initialize vector database service
+        do {
+            try await vectorService.initialize()
+            print("✅ Vector database initialized for Slack ingestion")
+        } catch {
+            print("⚠️ Vector database initialization failed: \(error)")
+            print("   Monitoring will continue but data won't be persisted")
+        }
         
         // Check accessibility permissions first
         let accessibilityStatus = await accessibilityManager.requestAccessibilityPermissions()
@@ -245,8 +255,64 @@ public final class SlackMonitoringService: ObservableObject {
             }
         }
         
-        // TODO Phase 4: Add deduplication logic here
-        // TODO Phase 5: Send to vector store here
+        // Phase 4: Send to vector store with automatic deduplication
+        await ingestConversationToVectorStore(conversation)
+    }
+    
+    // MARK: - Vector Database Integration
+    
+    /// Ingest Slack conversation into vector database
+    private func ingestConversationToVectorStore(_ conversation: SlackConversation) async {
+        do {
+            // Create a summary of the conversation for vector storage
+            let conversationText = conversation.messages.map { message in
+                "[\(message.sender)] \(message.content)"
+            }.joined(separator: "\n")
+            
+            let title = "Slack Conversation: \(conversation.channel)"
+            let summary = generateConversationSummary(conversation)
+            let sender = conversation.workspace
+            
+            print("   🔧 Ingesting conversation to vector database...")
+            print("      Title: \(title)")
+            print("      Content length: \(conversationText.count) characters")
+            print("      Messages: \(conversation.messages.count)")
+            
+            let result = try await vectorService.ingest(
+                content: conversationText,
+                title: title,
+                summary: summary,
+                sender: sender
+            )
+            
+            print("   ✅ Successfully ingested to vector database!")
+            print("      ID: \(result.summaryId)")
+            print("      Keywords: \(result.extractedKeywords.joined(separator: ", "))")
+            print("      Processing time: \(String(format: "%.2f", result.processingTime))s")
+            
+        } catch {
+            print("   ❌ Vector database ingestion failed: \(error.localizedDescription)")
+            print("      Error details: \(error)")
+        }
+    }
+    
+    /// Generate a concise summary of the Slack conversation
+    private func generateConversationSummary(_ conversation: SlackConversation) -> String {
+        let messageCount = conversation.messages.count
+        let uniqueSenders = Set(conversation.messages.map { $0.sender }).count
+        let channelInfo = "\(conversation.channel) (\(conversation.channelType))"
+        
+        // Get a sample of message content for context
+        let sampleMessages = conversation.messages.prefix(3).map { message in
+            let truncatedContent = String(message.content.prefix(50))
+            return "[\(message.sender)] \(truncatedContent)\(message.content.count > 50 ? "..." : "")"
+        }.joined(separator: "; ")
+        
+        return """
+        Slack conversation from \(channelInfo) in \(conversation.workspace). \
+        \(messageCount) messages from \(uniqueSenders) participants. \
+        Sample: \(sampleMessages)
+        """
     }
     
     // MARK: - System Event Handling

@@ -335,8 +335,4 @@ struct TestConversation {
 
 // MARK: - String Extension for Pretty Printing
 
-extension String {
-    static func *(left: String, right: Int) -> String {
-        return String(repeating: left, count: right)
-    }
-}
+// String multiplication operator removed to avoid conflicts

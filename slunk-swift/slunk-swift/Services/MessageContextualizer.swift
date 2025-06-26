@@ -276,7 +276,7 @@ public actor MessageContextualizer {
     
     public func createConversationChunks(
         from messages: [SlackMessage], 
-        timeWindow: TimeInterval = Self.defaultChunkTimeWindow
+        timeWindow: TimeInterval = 600 // 10 minutes
     ) async -> [ConversationChunk] {
         let sortedMessages = messages.sorted { $0.timestamp < $1.timestamp }
         var chunks: [ConversationChunk] = []
