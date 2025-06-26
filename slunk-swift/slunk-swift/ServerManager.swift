@@ -41,7 +41,8 @@ class ServerManager: ObservableObject {
             }
         }
         
-        mcpServer?.start()
+        // Don't start MCP server in GUI mode - it runs separately with --mcp flag
+        // mcpServer?.start()
         isRunning = true
         
         // Get the path to the current executable
@@ -53,7 +54,7 @@ class ServerManager: ObservableObject {
   "mcpServers": {
     "slunk": {
       "command": "\(executablePath)",
-      "args": [],
+      "args": ["--mcp"],
       "transport": "stdio"
     }
   }
@@ -61,25 +62,17 @@ class ServerManager: ObservableObject {
 """
         mcpConfig = configJSON
         
-        addLog("Server started (stdio transport)")
+        addLog("Monitoring service initialized")
         addLog("📍 Executable path: \(executablePath)")
-        addLog("💡 MCP config ready - use copy button above")
-        
-        // Simulate some initial activity
-        Task {
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            await MainActor.run {
-                addLog("Waiting for JSON-RPC messages on stdin...")
-            }
-        }
+        addLog("💡 MCP config ready - use copy button above to configure Claude Desktop")
     }
     
     func stop() {
         guard isRunning else { return }
         
-        mcpServer?.stop()
+        // MCP server runs separately, nothing to stop here
         isRunning = false
-        addLog("Server stopped")
+        addLog("Monitoring service stopped")
     }
     
     private func addLog(_ message: String) {

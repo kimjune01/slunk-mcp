@@ -33,7 +33,7 @@ struct ContentView: View {
             // Header with title and exit button
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("MCP Server")
+                    Text("Slunk Monitor")
                         .font(.title2)
                         .fontWeight(.medium)
                     
@@ -80,9 +80,9 @@ struct ContentView: View {
             .padding(.bottom, 5)
             
             
-            // Only show start button when server is not running
+            // Only show start button when monitoring is not running
             if !serverManager.isRunning {
-                Button("Start Server") {
+                Button("Start Monitoring") {
                     serverManager.start()
                 }
                 .buttonStyle(.borderedProminent)
@@ -91,7 +91,7 @@ struct ContentView: View {
             if serverManager.isRunning && !serverManager.mcpConfig.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Configuration")
+                        Text("MCP Server Configuration")
                             .font(.subheadline)
                             .fontWeight(.medium)
                         Spacer()
@@ -193,10 +193,7 @@ struct ContentView: View {
         .frame(width: 400, height: 290)
         .onAppear {
             refreshDatabaseStats()
-            // Auto-start MCP server
-            if !serverManager.isRunning {
-                serverManager.start()
-            }
+            // Note: Slack monitoring is started automatically by AppDelegate
         }
         .alert("Quit Application?", isPresented: $showingQuitConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -204,7 +201,7 @@ struct ContentView: View {
                 NSApplication.shared.terminate(nil)
             }
         } message: {
-            Text("Are you sure you want to quit the MCP Server?")
+            Text("Are you sure you want to quit Slunk? This will stop monitoring Slack messages.")
         }
     }
     
