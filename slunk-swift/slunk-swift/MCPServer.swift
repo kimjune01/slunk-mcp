@@ -20,7 +20,6 @@ class MCPServer {
     private let decoder = JSONDecoder()
     
     // Slack database components
-    private var database: SlackDatabaseSchema?
     private var queryService: SlackQueryService?
     private var messageContextualizer: MessageContextualizer?
     
@@ -62,33 +61,67 @@ class MCPServer {
     }
     
     private func readLoop() async {
+        logError("🔄 Starting read loop...")
+        
+        var buffer = Data()
+        
         while isRunning {
             do {
-                let data = inputHandle.availableData
-                guard !data.isEmpty else {
-                    try await Task.sleep(nanoseconds: Constants.readLoopSleepNanoseconds)
-                    continue
+                logError("📖 Waiting for input...")
+                
+                // Read available data
+                let chunk = inputHandle.availableData
+                logError("📊 Read \(chunk.count) bytes")
+                
+                if chunk.isEmpty {
+                    // No more data, check if stdin is closed
+                    let testData = inputHandle.availableData
+                    if testData.isEmpty {
+                        logError("🔚 No more input, checking if stdin is closed...")
+                        try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+                        continue
+                    }
+                } else {
+                    buffer.append(chunk)
+                    logError("📦 Buffer now has \(buffer.count) bytes")
                 }
                 
-                // Split by newlines to handle multiple messages
-                let messages = data.split(separator: UInt8(ascii: "\n"))
-                
-                for messageData in messages {
-                    if messageData.isEmpty { continue }
+                // Process complete lines
+                while let newlineIndex = buffer.firstIndex(of: UInt8(ascii: "\n")) {
+                    let lineData = buffer.prefix(upTo: newlineIndex)
+                    buffer.removeFirst(newlineIndex + 1)
+                    
+                    guard let line = String(data: lineData, encoding: .utf8) else {
+                        logError("⚠️ Failed to decode line as UTF-8")
+                        continue
+                    }
+                    
+                    let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    logError("📥 Received line: \(trimmedLine.prefix(100))...")
+                    
+                    guard !trimmedLine.isEmpty else { 
+                        logError("⚠️ Empty line, continuing...")
+                        continue 
+                    }
                     
                     do {
-                        let request = try decoder.decode(JSONRPCRequest.self, from: Data(messageData))
+                        let data = trimmedLine.data(using: .utf8) ?? Data()
+                        let request = try decoder.decode(JSONRPCRequest.self, from: data)
+                        logError("✅ Decoded request: \(request.method)")
                         let response = await handleRequest(request)
                         try sendResponse(response)
+                        logError("📤 Sent response for: \(request.method)")
                     } catch {
-                        logError("Failed to decode request: \(error)")
+                        logError("Failed to decode request: \(error) - Line: \(trimmedLine)")
                     }
                 }
+                
             } catch {
                 logError("Read loop error: \(error)")
                 try? await Task.sleep(nanoseconds: Constants.retryLoopSleepNanoseconds)
             }
         }
+        logError("🛑 Read loop ended")
     }
     
     private func handleRequest(_ request: JSONRPCRequest) async -> JSONRPCResponse {
@@ -417,7 +450,7 @@ class MCPServer {
     // MARK: - Enhanced MCP Tool Handlers
     
     func handleSearchConversations(_ request: MCPRequest) async -> JSONRPCResponse {
-        guard let database = database else {
+        guard let database = await ProductionService.shared.getDatabase() else {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Search service temporarily unavailable. The query engine is not initialized. This usually resolves within a few seconds after app startup. Please try again in a moment, or check if the Slack monitoring service is running."),
@@ -664,7 +697,7 @@ class MCPServer {
         
         let includeContext = arguments["include_context"] as? Bool ?? true
         
-        guard let database = self.database else {
+        guard let database = await ProductionService.shared.getDatabase() else {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Database not initialized"),
@@ -809,7 +842,7 @@ class MCPServer {
         
         let includeThread = arguments["include_thread"] as? Bool ?? true
         
-        guard let database = self.database else {
+        guard let database = await ProductionService.shared.getDatabase() else {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Database not initialized"),
@@ -1050,7 +1083,7 @@ class MCPServer {
         }
         
         // Check if database is available
-        guard let database = database else {
+        guard let database = await ProductionService.shared.getDatabase() else {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Query engine not available"),
