@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Slunk is a Swift/SwiftUI macOS application that monitors Slack in real-time and provides intelligent search capabilities through an MCP (Model Context Protocol) server. It stores messages locally with SQLite and offers 9 comprehensive search tools.
+Slunk is a Swift/SwiftUI macOS application that monitors Slack in real-time and provides intelligent search capabilities through an MCP (Model Context Protocol) server. It stores messages locally with SQLite and offers 9 comprehensive search tools with advanced deduplication.
 
 ## Development Commands
 
@@ -46,7 +46,7 @@ sqlite3 ~/Library/Application\ Support/Slunk/slack_store.db "SELECT COUNT(*) FRO
 ### Key Services
 
 1. **SlackMonitoringService** (`SlackScraper/Observer/`)
-   - Monitors Slack application state every second
+   - Monitors Slack application state (5s active, 10s background, 30s inactive)
    - Extracts messages using accessibility API
    - Logs to `~/Documents/slunk_debug.log`
    - Auto-starts database cleanup service (2-month retention)
@@ -71,14 +71,14 @@ sqlite3 ~/Library/Application\ Support/Slunk/slack_store.db "SELECT COUNT(*) FRO
 ```sql
 -- Main message table
 slack_messages (
-    id TEXT PRIMARY KEY,           -- Slack timestamp
+    id TEXT PRIMARY KEY,           -- Slack timestamp (e.g., 1750947252.454503)
     workspace TEXT,
     channel TEXT,
     sender TEXT,
     content TEXT,
     timestamp DATETIME,
     thread_ts TEXT,
-    content_hash TEXT,             -- SHA256 for deduplication
+    content_hash TEXT,             -- SHA256 of content+sender (no timestamp)
     version INTEGER
 )
 
@@ -89,24 +89,40 @@ slack_message_embeddings (
 )
 ```
 
+### Deduplication Strategy
+
+- **Deduplication Key**: SHA256 hash of `channel:sender:content`
+- **Content Hash**: SHA256 of `content+sender` (excludes timestamp)
+- Prevents storing duplicate messages captured during polling intervals
+- Maintains message edit history through version tracking
+
 ## MCP Tools (9 Total)
 
 ### Basic Search
-- `searchConversations` - Natural language search
+- `searchConversations` - Quick natural language searches across all messages
+  - Returns: `{id, title, summary, sender, timestamp, score, matchedKeywords}`
 
 ### Advanced Search
-- `search_messages` - Filtered search (channels, users, dates)
-- `get_thread_context` - Full thread extraction
-- `get_message_context` - Short message interpretation
+- `search_messages` - Precise searches with channel/user/date filters
+  - Returns: `{id, workspace, channel, sender, content, timestamp, threadId}`
+- `get_thread_context` - Retrieve complete thread conversations
+  - Returns: `{threadId, parentMessage, messages[], contextualMeanings[], participants[]}`
+- `get_message_context` - Understand cryptic messages/emojis with context
+  - Returns: `{originalMessage, contextualMeaning, threadContext, enhancement}`
 
 ### Intelligence Layer
-- `parse_natural_query` - NLP query parsing
-- `intelligent_search` - Context-aware search
-- `conversational_search` - Multi-turn sessions
+- `parse_natural_query` - Extract intent, entities, and dates from queries
+  - Returns: `{intent, keywords[], channels[], users[], entities[], temporalHint}`
+- `intelligent_search` - Complex analytical queries with deep understanding
+  - Returns: `{query, parsedIntent, results[], extractedKeywords[], extractedEntities[]}`
+- `conversational_search` - Multi-turn search sessions with context
+  - Returns: `{sessionId, results[], enhancedQuery, refinementSuggestions[], sessionContext}`
 
 ### Analytics
-- `discover_patterns` - Pattern analysis
-- `suggest_related` - Related content discovery
+- `discover_patterns` - Find trending topics and communication patterns
+  - Returns: `{patterns: {topics[], participants[], communication[]}, timeRange}`
+- `suggest_related` - Expand searches with semantically similar content
+  - Returns: `{suggestions[], referenceMessages[], queryContext, suggestionsCount}`
 
 ## Testing MCP Integration
 
@@ -132,3 +148,21 @@ echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"searchConversatio
 - **Database**: `~/Library/Application Support/Slunk/slack_store.db`
 - **Debug logs**: `~/Documents/slunk_debug.log`
 - **MCP config**: Add to `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+## Recent Improvements (June 2025)
+
+### Deduplication System
+- Content-based deduplication prevents storing duplicate messages
+- Reduced database size by ~95% by eliminating polling duplicates
+- Maintains edit history through version tracking
+
+### Enhanced Tool Descriptions
+- Clearer BEST FOR/USE WHEN/RETURNS format for all tools
+- Visual decision tree for tool selection
+- Concrete examples with actual parameter values
+- Simplified guidance for LLM agents
+
+### Performance Optimizations
+- Polling intervals: 5s (active), 10s (background), 30s (inactive)
+- Reduced CPU usage while maintaining responsiveness
+- Better database query performance with proper indexing

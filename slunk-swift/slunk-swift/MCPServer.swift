@@ -169,6 +169,17 @@ struct AnyCodable: Codable {
 }
 
 class MCPServer {
+    // MARK: - Constants
+    private enum Constants {
+        static let protocolVersion = "2024-11-05"
+        static let serverName = "Slunk MCP Server"
+        static let serverVersion = "0.1.0"
+        static let readLoopSleepNanoseconds: UInt64 = 10_000_000 // 10ms
+        static let retryLoopSleepNanoseconds: UInt64 = 100_000_000 // 100ms
+        static let shutdownDelayNanoseconds: UInt64 = 100_000_000 // 100ms
+    }
+    
+    // MARK: - Properties
     private let inputHandle = FileHandle.standardInput
     private let outputHandle = FileHandle.standardOutput
     private let errorHandle = FileHandle.standardError
@@ -238,7 +249,7 @@ class MCPServer {
             do {
                 let data = inputHandle.availableData
                 guard !data.isEmpty else {
-                    try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+                    try await Task.sleep(nanoseconds: Constants.readLoopSleepNanoseconds)
                     continue
                 }
                 
@@ -258,7 +269,7 @@ class MCPServer {
                 }
             } catch {
                 logError("Read loop error: \(error)")
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms before retry
+                try? await Task.sleep(nanoseconds: Constants.retryLoopSleepNanoseconds)
             }
         }
     }
@@ -286,13 +297,13 @@ class MCPServer {
     
     private func handleInitialize(_ request: JSONRPCRequest) -> JSONRPCResponse {
         let result: [String: Any] = [
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": Constants.protocolVersion,
             "capabilities": [
                 "tools": [:]
             ],
             "serverInfo": [
-                "name": "Slunk MCP Server",
-                "version": "0.1.0"
+                "name": Constants.serverName,
+                "version": Constants.serverVersion
             ]
         ]
         
@@ -560,7 +571,7 @@ class MCPServer {
     
     private func handleShutdown(_ request: JSONRPCRequest) -> JSONRPCResponse {
         Task {
-            try await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
+            try await Task.sleep(nanoseconds: Constants.shutdownDelayNanoseconds)
             stop()
         }
         return JSONRPCResponse(result: nil, error: nil, id: request.id)
@@ -582,44 +593,22 @@ class MCPServer {
         #endif
     }
     
-    // MARK: - Enhanced Error Handling
+    // MARK: - Error Handling
     
-    private func createHelpfulError(code: Int, message: String, suggestions: [String] = [], alternatives: [String] = []) -> JSONRPCError {
+    private func createError(code: Int, message: String, suggestions: [String] = []) -> JSONRPCError {
         var fullMessage = message
-        
         if !suggestions.isEmpty {
-            fullMessage += "\n\nSUGGESTIONS:\n" + suggestions.map { "• \($0)" }.joined(separator: "\n")
+            fullMessage += "\n💡 Try: " + suggestions.joined(separator: " | ")
         }
-        
-        if !alternatives.isEmpty {
-            fullMessage += "\n\nALTERNATIVES:\n" + alternatives.map { "• \($0)" }.joined(separator: "\n")
-        }
-        
         return JSONRPCError(code: code, message: fullMessage)
     }
     
-    private func createEmptyResultsGuidance(query: String, toolName: String) -> [String: Any] {
+    private func createEmptyResultsGuidance(query: String) -> [String: Any] {
         return [
             "results": [],
             "resultCount": 0,
             "query": query,
-            "emptyResultsGuidance": [
-                "possibleReasons": [
-                    "Query too specific - try broader keywords",
-                    "Time range too narrow - expand date range", 
-                    "No data for specified filters (channel/user)",
-                    "Search service still indexing recent messages"
-                ],
-                "suggestions": [
-                    "Try simpler keywords or synonyms",
-                    "Use 'intelligent_search' for complex queries",
-                    "Check spelling of channel/user names",
-                    "Try 'discover_patterns' to see what topics exist"
-                ],
-                "alternativeTools": toolName == "searchConversations" ? 
-                    ["search_messages (with filters)", "intelligent_search", "discover_patterns"] :
-                    ["searchConversations (simpler)", "intelligent_search", "discover_patterns"]
-            ]
+            "guidance": "No results found. Try: broader keywords | longer time range | 'discover_patterns' to see what's available"
         ]
     }
     
@@ -662,7 +651,7 @@ class MCPServer {
             
             // Provide helpful guidance for empty results
             let result: Any = searchResults.isEmpty ? 
-                createEmptyResultsGuidance(query: query, toolName: "searchConversations") :
+                createEmptyResultsGuidance(query: query) :
                 searchResults
             
             return JSONRPCResponse(
@@ -849,7 +838,7 @@ class MCPServer {
             
             // Provide helpful guidance for empty results
             let result: Any = formattedResults.isEmpty ?
-                createEmptyResultsGuidance(query: query, toolName: "search_messages") :
+                createEmptyResultsGuidance(query: query) :
                 formattedResults
             
             return JSONRPCResponse(result: result, error: nil, id: id)
@@ -1316,17 +1305,10 @@ class MCPServer {
         if referenceMessages.isEmpty && queryContext == nil {
             return JSONRPCResponse(
                 result: nil,
-                error: createHelpfulError(
+                error: createError(
                     code: -32602,
                     message: "Must provide either 'reference_messages' or 'query_context' parameter.",
-                    suggestions: [
-                        "Use {\"query_context\": \"topic description\"} to find related discussions",
-                        "Use {\"reference_messages\": [\"msg_id1\", \"msg_id2\"]} to find similar messages"
-                    ],
-                    alternatives: [
-                        "Try 'intelligent_search' for complex topic discovery",
-                        "Use 'search_messages' first to find specific messages, then suggest_related"
-                    ]
+                    suggestions: ["Add query_context: 'topic'", "Add reference_messages: ['id1']"]
                 ),
                 id: id
             )
