@@ -415,7 +415,9 @@ class MCPServer {
     private func sendResponse(_ response: JSONRPCResponse) throws {
         let data = try encoder.encode(response)
         outputHandle.write(data)
-        outputHandle.write("\n".data(using: .utf8)!)
+        if let newlineData = "\n".data(using: .utf8) {
+            outputHandle.write(newlineData)
+        }
         
         // Force flush
         fflush(stdout)
@@ -423,8 +425,10 @@ class MCPServer {
     
     private func logError(_ message: String) {
         #if DEBUG
-        errorHandle.write("[MCP Server] \(message)\n".data(using: .utf8)!)
-        fflush(stderr)
+        if let errorData = "[MCP Server] \(message)\n".data(using: .utf8) {
+            errorHandle.write(errorData)
+            fflush(stderr)
+        }
         #endif
     }
     
@@ -799,14 +803,21 @@ class MCPServer {
             }
             
             // Build result
+            let parentMessageData: Any
+            if let firstMessage = sortedMessages.first {
+                parentMessageData = [
+                    "id": firstMessage.message.id,
+                    "content": firstMessage.message.content,
+                    "sender": firstMessage.message.sender,
+                    "timestamp": ISO8601DateFormatter().string(from: firstMessage.message.timestamp)
+                ]
+            } else {
+                parentMessageData = NSNull()
+            }
+            
             let result: [String: Any] = [
                 "threadId": threadId,
-                "parentMessage": sortedMessages.first != nil ? [
-                    "id": sortedMessages.first!.message.id,
-                    "content": sortedMessages.first!.message.content,
-                    "sender": sortedMessages.first!.message.sender,
-                    "timestamp": ISO8601DateFormatter().string(from: sortedMessages.first!.message.timestamp)
-                ] : NSNull(),
+                "parentMessage": parentMessageData,
                 "messages": messageData,
                 "contextualMeanings": contextualMeanings,
                 "participants": Array(participants),

@@ -50,6 +50,8 @@ struct HistoryDatabase {
                 t.column("text", .text)
             }
         }
-        try migrator.migrate(dbQueue!)
+        if let queue = dbQueue {
+            try migrator.migrate(queue)
+        }
     }
 } 

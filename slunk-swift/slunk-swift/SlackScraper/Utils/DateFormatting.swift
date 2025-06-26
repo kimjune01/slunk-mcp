@@ -1,8 +1,9 @@
 import Foundation
 
 /// Thread-safe date formatter for ISO8601 dates used in Slack message processing
-public struct SendableISO8601DateFormatter: Sendable {
-    private nonisolated(unsafe) let formatter: ISO8601DateFormatter
+public final class SendableISO8601DateFormatter: @unchecked Sendable {
+    private let formatter: ISO8601DateFormatter
+    private let queue = DispatchQueue(label: "com.slunk.dateformatter")
     
     public init() {
         self.formatter = ISO8601DateFormatter()
@@ -10,11 +11,15 @@ public struct SendableISO8601DateFormatter: Sendable {
     }
     
     public func string(from date: Date) -> String {
-        return formatter.string(from: date)
+        return queue.sync {
+            formatter.string(from: date)
+        }
     }
     
     public func date(from string: String) -> Date? {
-        return formatter.date(from: string)
+        return queue.sync {
+            formatter.date(from: string)
+        }
     }
 }
 

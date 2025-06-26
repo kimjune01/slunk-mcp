@@ -86,7 +86,9 @@ public class SlackDatabaseSchema {
     }
     
     static func getPersistentDatabaseURL() throws -> URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw SlackDatabaseError.databaseInitializationFailed("Cannot find Application Support directory")
+        }
         let appDir = appSupport.appendingPathComponent("Slunk")
         
         // Create directory if it doesn't exist
@@ -941,6 +943,7 @@ enum SlackDatabaseError: Error {
     case updateFailed(String)
     case queryFailed(String)
     case serializationFailed(String)
+    case databaseInitializationFailed(String)
 }
 
 extension SlackDatabaseError: LocalizedError {
@@ -956,6 +959,8 @@ extension SlackDatabaseError: LocalizedError {
             return "Query failed: \(message)"
         case .serializationFailed(let message):
             return "Serialization failed: \(message)"
+        case .databaseInitializationFailed(let message):
+            return "Database initialization failed: \(message)"
         }
     }
 }

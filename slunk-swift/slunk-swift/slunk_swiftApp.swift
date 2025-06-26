@@ -11,31 +11,40 @@ struct slunk_swiftApp: App {
         let isMCPMode = args.contains("--mcp") || ProcessInfo.processInfo.environment["MCP_MODE"] != nil
         
         if isMCPMode {
-            // Run as MCP server only - do this synchronously
-            Task { @MainActor in
-                do {
-                    // Initialize the production service to set up database
-                    print("[MCP] Initializing database...")
-                    let productionService = ProductionService.shared
-                    try await productionService.initialize()
-                    print("[MCP] Database initialized successfully")
-                    
-                    // Create and start MCP server after database is ready
-                    let mcpServer = MCPServer()
-                    print("[MCP] Starting MCP server...")
-                    mcpServer.start()
-                    
-                    // Keep the process running for MCP communication
-                    dispatchMain()
-                    
-                } catch {
-                    print("[MCP] Failed to initialize: \(error)")
-                    exit(1)
-                }
-            }
+            // Run as MCP server only
+            // Create a separate function to handle MCP mode
+            runMCPMode()
             
             // This prevents the SwiftUI app from starting
             return
+        }
+    }
+    
+    private func runMCPMode() {
+        // Initialize MCP server asynchronously
+        Task {
+            do {
+                // Initialize the production service to set up database
+                FileHandle.standardError.write("[MCP] Initializing database...\n".data(using: .utf8)!)
+                let productionService = ProductionService.shared
+                try await productionService.initialize()
+                FileHandle.standardError.write("[MCP] Database initialized successfully\n".data(using: .utf8)!)
+                
+                // Create and start MCP server after database is ready
+                let mcpServer = MCPServer()
+                FileHandle.standardError.write("[MCP] Starting MCP server...\n".data(using: .utf8)!)
+                mcpServer.start()
+                
+                // Use RunLoop.main.run() instead of dispatchMain()
+                // This is the preferred approach for macOS applications
+                // and avoids the dispatch_main restriction issues
+                FileHandle.standardError.write("[MCP] Server started, entering run loop...\n".data(using: .utf8)!)
+                RunLoop.main.run()
+                
+            } catch {
+                FileHandle.standardError.write("[MCP] Failed to initialize: \(error)\n".data(using: .utf8)!)
+                exit(1)
+            }
         }
     }
     
