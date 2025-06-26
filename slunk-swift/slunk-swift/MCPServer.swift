@@ -180,6 +180,7 @@ class MCPServer {
     private var database: SQLiteVecSchema?
     private var queryEngine: NaturalLanguageQueryEngine?
     private var smartIngestion: SmartIngestionService?
+    private var conversationalSearch: ConversationalSearchService?
     
     init() {
         setupHandlers()
@@ -189,6 +190,15 @@ class MCPServer {
     private func setupVectorComponents() {
         self.queryEngine = NaturalLanguageQueryEngine()
         self.smartIngestion = SmartIngestionService()
+        
+        // Set up conversational search after query engine is created
+        if let queryEngine = self.queryEngine {
+            let embeddingService = EmbeddingService()
+            self.conversationalSearch = ConversationalSearchService(
+                queryEngine: queryEngine,
+                embeddingService: embeddingService
+            )
+        }
     }
     
     func setDatabase(_ database: SQLiteVecSchema) {
@@ -380,16 +390,80 @@ class MCPServer {
                     "required": ["message_id"]
                 ]
             ],
+            // Phase 3: Advanced Query Processing Tools
             [
-                "name": "analyze_conversation",
-                "description": "Generate conversation summary and extract key insights",
+                "name": "parse_natural_query",
+                "description": "Parse natural language queries to extract intent, entities, and temporal hints",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "messages": ["type": "array", "items": ["type": "string"], "description": "Array of message IDs to analyze"],
-                        "conversation_id": ["type": "string", "description": "Conversation/thread ID to analyze"],
-                        "analysis_type": ["type": "string", "enum": ["summary", "sentiment", "topics", "participants", "all"], "default": "summary"]
+                        "query": ["type": "string", "description": "Natural language query to parse"],
+                        "include_entities": ["type": "boolean", "default": true, "description": "Include entity extraction"],
+                        "include_temporal": ["type": "boolean", "default": true, "description": "Include temporal hint extraction"]
+                    ],
+                    "required": ["query"]
+                ]
+            ],
+            [
+                "name": "intelligent_search",
+                "description": "Advanced search combining natural language understanding with contextual search",
+                "inputSchema": [
+                    "type": "object",
+                    "properties": [
+                        "query": ["type": "string", "description": "Natural language search query"],
+                        "context": ["type": "string", "description": "Optional context from previous searches"],
+                        "refine_previous": ["type": "boolean", "default": false, "description": "Refine previous search results"],
+                        "limit": ["type": "integer", "default": 10, "minimum": 1, "maximum": 50]
+                    ],
+                    "required": ["query"]
+                ]
+            ],
+            [
+                "name": "discover_patterns",
+                "description": "Discover conversation patterns and recurring themes",
+                "inputSchema": [
+                    "type": "object",
+                    "properties": [
+                        "time_range": ["type": "string", "enum": ["day", "week", "month", "all"], "default": "week"],
+                        "pattern_type": ["type": "string", "enum": ["topics", "participants", "communication", "all"], "default": "all"],
+                        "min_occurrences": ["type": "integer", "default": 3, "minimum": 2]
                     ]
+                ]
+            ],
+            [
+                "name": "suggest_related",
+                "description": "Suggest related conversations based on current query or context",
+                "inputSchema": [
+                    "type": "object",
+                    "properties": [
+                        "reference_messages": ["type": "array", "items": ["type": "string"], "description": "Reference messages to find related content"],
+                        "query_context": ["type": "string", "description": "Query context to base suggestions on"],
+                        "suggestion_type": ["type": "string", "enum": ["similar", "followup", "related", "all"], "default": "all"],
+                        "limit": ["type": "integer", "default": 5, "minimum": 1, "maximum": 20]
+                    ]
+                ]
+            ],
+            [
+                "name": "conversational_search",
+                "description": "Multi-turn conversational search with context awareness and refinement",
+                "inputSchema": [
+                    "type": "object",
+                    "properties": [
+                        "query": ["type": "string", "description": "Natural language search query"],
+                        "session_id": ["type": "string", "description": "Conversation session ID (optional, will create new if not provided)"],
+                        "action": ["type": "string", "enum": ["search", "refine", "start_session", "end_session"], "default": "search"],
+                        "refinement": [
+                            "type": "object",
+                            "properties": [
+                                "type": ["type": "string", "enum": ["add_keywords", "remove_keywords", "add_channels", "add_users", "change_time"]],
+                                "keywords": ["type": "array", "items": ["type": "string"]],
+                                "channels": ["type": "array", "items": ["type": "string"]],
+                                "users": ["type": "array", "items": ["type": "string"]]
+                            ]
+                        ],
+                        "limit": ["type": "integer", "default": 10, "minimum": 1, "maximum": 50]
+                    ],
+                    "required": ["query"]
                 ]
             ]
         ]
@@ -418,9 +492,6 @@ class MCPServer {
         case "ingestText":
             return await handleIngestText(MCPRequest(method: name, params: arguments))
             
-        case "getConversationStats":
-            return await handleGetConversationStats(MCPRequest(method: name, params: arguments))
-            
         case "swiftVersion":
             let version = MCPServer.swiftVersion() ?? "Unknown"
             return JSONRPCResponse(
@@ -439,8 +510,21 @@ class MCPServer {
         case "get_message_context":
             return await handleGetMessageContext(arguments, id: request.id)
             
-        case "analyze_conversation":
-            return await handleAnalyzeConversation(arguments, id: request.id)
+        // Phase 3: Advanced Query Processing Tools
+        case "parse_natural_query":
+            return await handleParseNaturalQuery(arguments, id: request.id)
+            
+        case "intelligent_search":
+            return await handleIntelligentSearch(arguments, id: request.id)
+            
+        case "discover_patterns":
+            return await handleDiscoverPatterns(arguments, id: request.id)
+            
+        case "suggest_related":
+            return await handleSuggestRelated(arguments, id: request.id)
+            
+        case "conversational_search":
+            return await handleConversationalSearch(arguments, id: request.id)
             
         default:
             return JSONRPCResponse(
@@ -585,34 +669,6 @@ class MCPServer {
         }
     }
     
-    func handleGetConversationStats(_ request: MCPRequest) async -> JSONRPCResponse {
-        guard let database = database else {
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32603, message: "Database not available"),
-                id: JSONRPCId.string(request.id)
-            )
-        }
-        
-        let timeRange = request.params["timeRange"] as? String ?? "all"
-        
-        do {
-            let stats = try await generateConversationStats(database: database, timeRange: timeRange)
-            
-            return JSONRPCResponse(
-                result: stats,
-                error: nil,
-                id: JSONRPCId.string(request.id)
-            )
-            
-        } catch {
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32603, message: "Stats generation failed: \(error.localizedDescription)"),
-                id: JSONRPCId.string(request.id)
-            )
-        }
-    }
     
     func handleRequest(_ request: MCPRequest) async -> JSONRPCResponse {
         // Generic handler for tests - just calls the specific handlers
@@ -820,44 +876,515 @@ class MCPServer {
         return JSONRPCResponse(result: result, error: nil, id: id)
     }
     
-    internal func handleAnalyzeConversation(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
-        let messageIds = arguments["messages"] as? [String] ?? []
-        let conversationId = arguments["conversation_id"] as? String
-        let analysisType = arguments["analysis_type"] as? String ?? "summary"
-        
-        // Validate that we have either message IDs or conversation ID
-        if messageIds.isEmpty && conversationId == nil {
+    // MARK: - Phase 3 MCP Tool Handlers
+    
+    internal func handleParseNaturalQuery(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+        guard let query = arguments["query"] as? String else {
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32602, message: "Must provide either 'messages' array or 'conversation_id'"),
+                error: JSONRPCError(code: -32602, message: "Missing required parameter: query"),
                 id: id
             )
         }
         
-        // For now, return a placeholder response
-        // TODO: Implement actual conversation analysis
-        let result = [
-            "analysisType": analysisType,
-            "messageIds": messageIds,
-            "conversationId": conversationId as Any,
-            "status": "Conversation analysis ready",
-            "message": "Conversation analysis functionality implemented but requires database integration",
-            "placeholder": [
-                "summary": "Conversation analysis will be available once database integration is complete",
-                "participants": [],
-                "topics": [],
-                "sentiment": [
-                    "overall": "neutral",
-                    "breakdown": []
-                ],
-                "insights": [
-                    "messageCount": messageIds.count,
-                    "analysisRequested": analysisType
-                ]
+        let includeEntities = arguments["include_entities"] as? Bool ?? true
+        let includeTemporal = arguments["include_temporal"] as? Bool ?? true
+        
+        // Use the existing QueryParser from NaturalLanguageQueryEngine
+        let parser = QueryParser()
+        let parsedQuery = parser.parse(query)
+        
+        var result: [String: Any] = [
+            "originalQuery": query,
+            "intent": intentToString(parsedQuery.intent),
+            "keywords": parsedQuery.keywords,
+            "channels": parsedQuery.channels,
+            "users": parsedQuery.users
+        ]
+        
+        if includeEntities {
+            result["entities"] = parsedQuery.entities
+        }
+        
+        if includeTemporal, let temporalHint = parsedQuery.temporalHint {
+            result["temporalHint"] = [
+                "type": temporalHint.type == .relative ? "relative" : "absolute",
+                "value": temporalHint.value,
+                "resolvedDate": temporalHint.resolvedDate?.timeIntervalSince1970 as Any
             ]
-        ] as [String: Any]
+        }
+        
+        result["status"] = "Query parsing complete with advanced NLP"
         
         return JSONRPCResponse(result: result, error: nil, id: id)
+    }
+    
+    internal func handleIntelligentSearch(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+        guard let query = arguments["query"] as? String else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32602, message: "Missing required parameter: query"),
+                id: id
+            )
+        }
+        
+        let context = arguments["context"] as? String
+        let refinePrevious = arguments["refine_previous"] as? Bool ?? false
+        let limit = arguments["limit"] as? Int ?? 10
+        
+        // Check if query engine is available
+        guard let queryEngine = queryEngine else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Query engine not available"),
+                id: id
+            )
+        }
+        
+        do {
+            // Parse the natural language query
+            let parsedQuery = queryEngine.parseQuery(query)
+            
+            // For now, execute basic hybrid search
+            // TODO: Add context-aware refinement and multi-turn search
+            let searchResults = try await queryEngine.executeHybridSearch(parsedQuery, limit: limit)
+            
+            let results = searchResults.map { result in
+                [
+                    "title": result.summary.title,
+                    "summary": result.summary.summary,
+                    "combinedScore": result.combinedScore,
+                    "matchedKeywords": result.matchedKeywords,
+                    "semanticScore": result.semanticScore,
+                    "keywordScore": result.keywordScore
+                ] as [String: Any]
+            }
+            
+            let response = [
+                "query": query,
+                "parsedIntent": intentToString(parsedQuery.intent),
+                "extractedKeywords": parsedQuery.keywords,
+                "extractedEntities": parsedQuery.entities,
+                "extractedChannels": parsedQuery.channels,
+                "extractedUsers": parsedQuery.users,
+                "context": context as Any,
+                "refinePrevious": refinePrevious,
+                "results": results,
+                "resultCount": results.count,
+                "status": "Intelligent search complete with NLP processing"
+            ] as [String: Any]
+            
+            return JSONRPCResponse(result: response, error: nil, id: id)
+            
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Intelligent search failed: \(error.localizedDescription)"),
+                id: id
+            )
+        }
+    }
+    
+    internal func handleDiscoverPatterns(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+        let timeRange = arguments["time_range"] as? String ?? "week"
+        let patternType = arguments["pattern_type"] as? String ?? "all"
+        let minOccurrences = arguments["min_occurrences"] as? Int ?? 3
+        
+        // Check if database is available
+        guard let database = database else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Database not available"),
+                id: id
+            )
+        }
+        
+        do {
+            // Get conversation summaries for pattern analysis
+            let summaries = try await database.getAllSummaries(limit: 1000)
+            
+            // Analyze patterns based on keywords and entities
+            let topicPatterns = analyzeTopicPatterns(summaries: summaries, minOccurrences: minOccurrences)
+            let participantPatterns = analyzeParticipantPatterns(summaries: summaries, minOccurrences: minOccurrences)
+            let communicationPatterns = analyzeCommunicationPatterns(summaries: summaries)
+            
+            var result: [String: Any] = [
+                "timeRange": timeRange,
+                "patternType": patternType,
+                "minOccurrences": minOccurrences,
+                "analysisDate": Date().timeIntervalSince1970
+            ]
+            
+            switch patternType {
+            case "topics":
+                result["patterns"] = ["topics": topicPatterns]
+            case "participants":
+                result["patterns"] = ["participants": participantPatterns]
+            case "communication":
+                result["patterns"] = ["communication": communicationPatterns]
+            default: // "all"
+                result["patterns"] = [
+                    "topics": topicPatterns,
+                    "participants": participantPatterns,
+                    "communication": communicationPatterns
+                ]
+            }
+            
+            result["status"] = "Pattern discovery complete"
+            
+            return JSONRPCResponse(result: result, error: nil, id: id)
+            
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Pattern discovery failed: \(error.localizedDescription)"),
+                id: id
+            )
+        }
+    }
+    
+    internal func handleSuggestRelated(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+        let referenceMessages = arguments["reference_messages"] as? [String] ?? []
+        let queryContext = arguments["query_context"] as? String
+        let suggestionType = arguments["suggestion_type"] as? String ?? "all"
+        let limit = arguments["limit"] as? Int ?? 5
+        
+        // Check if we have either reference messages or query context
+        if referenceMessages.isEmpty && queryContext == nil {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32602, message: "Must provide either 'reference_messages' or 'query_context'"),
+                id: id
+            )
+        }
+        
+        // Check if query engine is available
+        guard let queryEngine = queryEngine else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Query engine not available"),
+                id: id
+            )
+        }
+        
+        do {
+            var suggestions: [[String: Any]] = []
+            
+            // If we have query context, use it to find related content
+            if let context = queryContext {
+                let parsedQuery = queryEngine.parseQuery(context)
+                let searchResults = try await queryEngine.executeHybridSearch(parsedQuery, limit: limit)
+                
+                suggestions = searchResults.map { result in
+                    [
+                        "type": "contextual",
+                        "title": result.summary.title,
+                        "summary": result.summary.summary,
+                        "score": result.combinedScore,
+                        "reason": "Related to query context: \(parsedQuery.keywords.joined(separator: ", "))"
+                    ] as [String: Any]
+                }
+            }
+            
+            // TODO: Add reference message-based suggestions
+            // This would involve looking up the reference messages and finding similar content
+            
+            let result = [
+                "referenceMessages": referenceMessages,
+                "queryContext": queryContext as Any,
+                "suggestionType": suggestionType,
+                "suggestions": suggestions,
+                "suggestionsCount": suggestions.count,
+                "status": "Related content suggestions generated"
+            ] as [String: Any]
+            
+            return JSONRPCResponse(result: result, error: nil, id: id)
+            
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Related suggestions failed: \(error.localizedDescription)"),
+                id: id
+            )
+        }
+    }
+    
+    internal func handleConversationalSearch(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+        guard let query = arguments["query"] as? String else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32602, message: "Missing required parameter: query"),
+                id: id
+            )
+        }
+        
+        let action = arguments["action"] as? String ?? "search"
+        let sessionId = arguments["session_id"] as? String
+        let limit = arguments["limit"] as? Int ?? 10
+        
+        // Check if conversational search service is available
+        guard let conversationalSearch = conversationalSearch else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Conversational search service not available"),
+                id: id
+            )
+        }
+        
+        do {
+            switch action {
+            case "start_session":
+                let newSessionId = await conversationalSearch.startSession(sessionId: sessionId)
+                let result = [
+                    "action": "start_session",
+                    "sessionId": newSessionId,
+                    "status": "Session started successfully"
+                ] as [String: Any]
+                return JSONRPCResponse(result: result, error: nil, id: id)
+                
+            case "end_session":
+                if let sessionId = sessionId {
+                    await conversationalSearch.endSession(sessionId)
+                    let result = [
+                        "action": "end_session",
+                        "sessionId": sessionId,
+                        "status": "Session ended successfully"
+                    ] as [String: Any]
+                    return JSONRPCResponse(result: result, error: nil, id: id)
+                } else {
+                    return JSONRPCResponse(
+                        result: nil,
+                        error: JSONRPCError(code: -32602, message: "Session ID required for end_session action"),
+                        id: id
+                    )
+                }
+                
+            case "refine":
+                guard let sessionId = sessionId else {
+                    return JSONRPCResponse(
+                        result: nil,
+                        error: JSONRPCError(code: -32602, message: "Session ID required for refine action"),
+                        id: id
+                    )
+                }
+                
+                // Parse refinement parameters
+                let refinementData = arguments["refinement"] as? [String: Any] ?? [:]
+                let refinementType = refinementData["type"] as? String ?? "add_keywords"
+                let keywords = refinementData["keywords"] as? [String] ?? []
+                let channels = refinementData["channels"] as? [String] ?? []
+                let users = refinementData["users"] as? [String] ?? []
+                
+                let refinement = parseSearchRefinement(
+                    type: refinementType,
+                    keywords: keywords,
+                    channels: channels,
+                    users: users
+                )
+                
+                let searchResult = try await conversationalSearch.refineLastSearch(
+                    sessionId: sessionId,
+                    refinement: refinement,
+                    limit: limit
+                )
+                
+                let result = formatConversationalSearchResult(searchResult)
+                return JSONRPCResponse(result: result, error: nil, id: id)
+                
+            default: // "search"
+                var effectiveSessionId = sessionId
+                
+                // Start new session if none provided
+                if effectiveSessionId == nil {
+                    effectiveSessionId = await conversationalSearch.startSession()
+                }
+                
+                let searchResult = try await conversationalSearch.search(
+                    query: query,
+                    sessionId: effectiveSessionId!,
+                    limit: limit
+                )
+                
+                let result = formatConversationalSearchResult(searchResult)
+                return JSONRPCResponse(result: result, error: nil, id: id)
+            }
+            
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Conversational search failed: \(error.localizedDescription)"),
+                id: id
+            )
+        }
+    }
+    
+    // MARK: - Helper Methods for Phase 3
+    
+    private func intentToString(_ intent: QueryIntent) -> String {
+        switch intent {
+        case .search: return "search"
+        case .show: return "show"
+        case .list: return "list"
+        case .analyze: return "analyze"
+        case .summarize: return "summarize"
+        case .compare: return "compare"
+        case .filter: return "filter"
+        }
+    }
+    
+    private func analyzeTopicPatterns(summaries: [TextSummary], minOccurrences: Int) -> [[String: Any]] {
+        // Analyze keywords to find recurring topics
+        let allKeywords = summaries.flatMap { $0.keywords }
+        let keywordCounts = Dictionary(grouping: allKeywords, by: { $0 })
+            .mapValues { $0.count }
+            .filter { $0.value >= minOccurrences }
+            .sorted { $0.value > $1.value }
+        
+        return keywordCounts.map { keyword, count in
+            [
+                "topic": keyword,
+                "occurrences": count,
+                "frequency": Double(count) / Double(summaries.count),
+                "type": "keyword_based"
+            ] as [String: Any]
+        }
+    }
+    
+    private func analyzeParticipantPatterns(summaries: [TextSummary], minOccurrences: Int) -> [[String: Any]] {
+        // Analyze sender patterns
+        let senders = summaries.compactMap { $0.sender }
+        let senderCounts = Dictionary(grouping: senders, by: { $0 })
+            .mapValues { $0.count }
+            .filter { $0.value >= minOccurrences }
+            .sorted { $0.value > $1.value }
+        
+        return senderCounts.map { sender, count in
+            [
+                "participant": sender,
+                "messageCount": count,
+                "frequency": Double(count) / Double(summaries.count),
+                "type": "sender_activity"
+            ] as [String: Any]
+        }
+    }
+    
+    private func analyzeCommunicationPatterns(summaries: [TextSummary]) -> [[String: Any]] {
+        // Analyze temporal patterns
+        let timestamps = summaries.map { $0.timestamp }
+        let calendar = Calendar.current
+        
+        // Group by hour of day
+        let hourCounts = Dictionary(grouping: timestamps) { timestamp in
+            calendar.component(.hour, from: timestamp)
+        }.mapValues { $0.count }
+        
+        // Group by day of week
+        let dayOfWeekCounts = Dictionary(grouping: timestamps) { timestamp in
+            calendar.component(.weekday, from: timestamp)
+        }.mapValues { $0.count }
+        
+        return [
+            [
+                "pattern": "hourly_activity",
+                "data": hourCounts.sorted { $0.key < $1.key }.map { ["hour": $0.key, "count": $0.value] },
+                "type": "temporal"
+            ],
+            [
+                "pattern": "daily_activity", 
+                "data": dayOfWeekCounts.sorted { $0.key < $1.key }.map { ["day": $0.key, "count": $0.value] },
+                "type": "temporal"
+            ]
+        ] as [[String: Any]]
+    }
+    
+    private func parseSearchRefinement(
+        type: String,
+        keywords: [String],
+        channels: [String],
+        users: [String]
+    ) -> SearchRefinement {
+        let refinementType: SearchRefinement.RefinementType
+        
+        switch type {
+        case "add_keywords":
+            refinementType = .addKeywords
+        case "remove_keywords":
+            refinementType = .removeKeywords
+        case "add_channels":
+            refinementType = .addChannelFilter
+        case "add_users":
+            refinementType = .addUserFilter
+        case "change_time":
+            refinementType = .changeTimeRange
+        default:
+            refinementType = .addKeywords
+        }
+        
+        return SearchRefinement(
+            type: refinementType,
+            keywords: keywords,
+            channels: channels,
+            users: users,
+            temporalHint: nil
+        )
+    }
+    
+    private func formatConversationalSearchResult(_ searchResult: ConversationalSearchResult) -> [String: Any] {
+        let results = searchResult.results.map { result in
+            [
+                "title": result.summary.title,
+                "summary": result.summary.summary,
+                "combinedScore": result.combinedScore,
+                "matchedKeywords": result.matchedKeywords,
+                "semanticScore": result.semanticScore,
+                "keywordScore": result.keywordScore
+            ] as [String: Any]
+        }
+        
+        let refinementSuggestions = searchResult.refinementSuggestions.map { suggestion in
+            [
+                "type": suggestionTypeToString(suggestion.type),
+                "description": suggestion.description,
+                "suggestedModification": suggestion.suggestedModification
+            ] as [String: Any]
+        }
+        
+        return [
+            "sessionId": searchResult.sessionId,
+            "turnNumber": searchResult.turnNumber,
+            "originalQuery": searchResult.originalQuery,
+            "enhancedQuery": [
+                "originalText": searchResult.enhancedQuery.originalText,
+                "intent": intentToString(searchResult.enhancedQuery.intent),
+                "keywords": searchResult.enhancedQuery.keywords,
+                "entities": searchResult.enhancedQuery.entities,
+                "channels": searchResult.enhancedQuery.channels,
+                "users": searchResult.enhancedQuery.users
+            ],
+            "results": results,
+            "resultCount": results.count,
+            "refinementSuggestions": refinementSuggestions,
+            "sessionContext": [
+                "sessionId": searchResult.sessionContext.sessionId,
+                "turnCount": searchResult.sessionContext.turnCount,
+                "recentQueries": searchResult.sessionContext.recentQueries,
+                "dominantTopics": searchResult.sessionContext.dominantTopics,
+                "searchPatterns": searchResult.sessionContext.searchPatterns,
+                "sessionDuration": searchResult.sessionContext.sessionDuration
+            ],
+            "status": "Conversational search completed"
+        ] as [String: Any]
+    }
+    
+    private func suggestionTypeToString(_ type: RefinementSuggestion.SuggestionType) -> String {
+        switch type {
+        case .addTimeFilter: return "add_time_filter"
+        case .addChannelFilter: return "add_channel_filter"
+        case .addUserFilter: return "add_user_filter"
+        case .narrowScope: return "narrow_scope"
+        case .expandScope: return "expand_scope"
+        case .combineWithPrevious: return "combine_with_previous"
+        }
     }
     
     static func swiftVersion() -> String? {

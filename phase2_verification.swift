@@ -22,10 +22,6 @@ let phase2Tools = [
         "description": "Get contextual meaning for short messages (emoji, abbreviations, etc.)",
         "parameters": ["message_id", "include_thread"]
     ],
-    "analyze_conversation": [
-        "description": "Generate conversation summary and extract key insights",
-        "parameters": ["messages", "conversation_id", "analysis_type"]
-    ]
 ]
 
 print("\n✅ Phase 2 Tools Implementation Verified:")

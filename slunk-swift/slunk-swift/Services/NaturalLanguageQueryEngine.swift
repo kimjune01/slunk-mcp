@@ -150,7 +150,7 @@ class NaturalLanguageQueryEngine {
             
             // Apply temporal filter
             if let temporalHint = parsedQuery.temporalHint {
-                let dateRange = resolveTemporalHint(temporalHint)
+                let _ = resolveTemporalHint(temporalHint)
                 // For now, skip temporal filtering in simplified version
             }
             
@@ -234,38 +234,71 @@ class NaturalLanguageQueryEngine {
 class QueryParser {
     private let tagger: NLTagger
     private let intentKeywords: [QueryIntent: Set<String>]
+    private var channelPatterns: [NSRegularExpression]
+    private var userPatterns: [NSRegularExpression]
     
     init() {
-        self.tagger = NLTagger(tagSchemes: [.nameType, .lexicalClass])
+        self.tagger = NLTagger(tagSchemes: [.nameType, .lexicalClass, .language])
         
+        // Enhanced intent recognition with more keywords
         self.intentKeywords = [
-            .search: Set(["find", "search", "look", "get", "where"]),
-            .show: Set(["show", "display", "present", "reveal"]),
-            .list: Set(["list", "enumerate", "all", "every"]),
-            .analyze: Set(["analyze", "review", "examine", "study"])
+            .search: Set(["find", "search", "look", "get", "where", "locate", "discover", "fetch"]),
+            .show: Set(["show", "display", "present", "reveal", "demonstrate", "exhibit"]),
+            .list: Set(["list", "enumerate", "all", "every", "count", "inventory"]),
+            .analyze: Set(["analyze", "review", "examine", "study", "investigate", "evaluate", "assess"]),
+            .summarize: Set(["summarize", "summary", "brief", "overview", "recap", "digest"]),
+            .compare: Set(["compare", "contrast", "difference", "versus", "against", "between"]),
+            .filter: Set(["filter", "narrow", "limit", "restrict", "constrain", "select"])
         ]
+        
+        // Regular expressions for channel and user detection
+        do {
+            self.channelPatterns = [
+                try NSRegularExpression(pattern: "#([a-zA-Z0-9_-]+)", options: []),
+                try NSRegularExpression(pattern: "in\\s+([a-zA-Z0-9_-]+)\\s+channel", options: [.caseInsensitive]),
+                try NSRegularExpression(pattern: "channel\\s+([a-zA-Z0-9_-]+)", options: [.caseInsensitive])
+            ]
+            
+            self.userPatterns = [
+                try NSRegularExpression(pattern: "@([a-zA-Z0-9._-]+)", options: []),
+                try NSRegularExpression(pattern: "from\\s+([a-zA-Z0-9._-]+)", options: [.caseInsensitive]),
+                try NSRegularExpression(pattern: "by\\s+([a-zA-Z0-9._-]+)", options: [.caseInsensitive]),
+                try NSRegularExpression(pattern: "sent\\s+by\\s+([a-zA-Z0-9._-]+)", options: [.caseInsensitive])
+            ]
+        } catch {
+            // Fall back to empty arrays if regex compilation fails
+            self.channelPatterns = []
+            self.userPatterns = []
+        }
     }
     
     func parse(_ queryText: String) -> ParsedQuery {
-        let trimmedQuery = queryText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let trimmedQuery = queryText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercaseQuery = trimmedQuery.lowercased()
         
         // Extract intent
-        let intent = extractIntent(from: trimmedQuery)
+        let intent = extractIntent(from: lowercaseQuery)
         
         // Extract keywords (nouns, adjectives, important terms)
-        let keywords = extractKeywords(from: trimmedQuery)
+        let keywords = extractKeywords(from: lowercaseQuery)
         
         // Extract entities (people, places, organizations)
         let entities = extractEntities(from: trimmedQuery)
         
+        // Extract channels and users using regex patterns
+        let channels = extractChannels(from: trimmedQuery)
+        let users = extractUsers(from: trimmedQuery)
+        
         // Extract temporal hints
-        let temporalHint = extractTemporalHint(from: trimmedQuery)
+        let temporalHint = extractTemporalHint(from: lowercaseQuery)
         
         return ParsedQuery(
-            originalText: trimmedQuery,
+            originalText: lowercaseQuery,
             intent: intent,
             keywords: keywords,
             entities: entities,
+            channels: channels,
+            users: users,
             temporalHint: temporalHint
         )
     }
@@ -367,6 +400,44 @@ class QueryParser {
         
         return nil
     }
+    
+    private func extractChannels(from text: String) -> [String] {
+        var channels: Set<String> = []
+        
+        for pattern in channelPatterns {
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            let matches = pattern.matches(in: text, range: range)
+            
+            for match in matches {
+                if match.numberOfRanges > 1 {
+                    let channelRange = Range(match.range(at: 1), in: text)!
+                    let channel = String(text[channelRange])
+                    channels.insert(channel.lowercased())
+                }
+            }
+        }
+        
+        return Array(channels)
+    }
+    
+    private func extractUsers(from text: String) -> [String] {
+        var users: Set<String> = []
+        
+        for pattern in userPatterns {
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            let matches = pattern.matches(in: text, range: range)
+            
+            for match in matches {
+                if match.numberOfRanges > 1 {
+                    let userRange = Range(match.range(at: 1), in: text)!
+                    let user = String(text[userRange])
+                    users.insert(user.lowercased())
+                }
+            }
+        }
+        
+        return Array(users)
+    }
 }
 
 // MARK: - Supporting Types
@@ -376,6 +447,8 @@ struct ParsedQuery {
     let intent: QueryIntent
     let keywords: [String]
     let entities: [String]
+    let channels: [String]
+    let users: [String]
     let temporalHint: TemporalHint?
 }
 
@@ -384,6 +457,9 @@ enum QueryIntent {
     case show
     case list
     case analyze
+    case summarize
+    case compare
+    case filter
 }
 
 struct TemporalHint {

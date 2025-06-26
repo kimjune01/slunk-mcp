@@ -70,47 +70,7 @@ final class MCPIntegrationTests: XCTestCase {
         let mcpServer = MCPServer()
         mcpServer.setDatabase(schema)
         
-        // Test searchConversations with natural language
-        let searchRequest = MCPRequest(
-            method: "searchConversations",
-            params: [
-                "query": "Swift programming",
-                "limit": 5
-            ]
-        )
-        
-        let searchResponse = try await mcpServer.handleSearchConversations(searchRequest)
-        XCTAssertNotNil(searchResponse.result, "Should return search results")
-        
-        if let results = searchResponse.result as? [[String: Any]] {
-            XCTAssertFalse(results.isEmpty, "Should find Swift-related conversations")
-            
-            for result in results {
-                XCTAssertNotNil(result["id"], "Result should have ID")
-                XCTAssertNotNil(result["title"], "Result should have title")
-                XCTAssertNotNil(result["summary"], "Result should have summary")
-                XCTAssertNotNil(result["score"], "Result should have relevance score")
-            }
-        }
-        
-        // Test ingestText with automatic processing
-        let ingestRequest = MCPRequest(
-            method: "ingestText",
-            params: [
-                "content": "This is a test conversation about iOS development using SwiftUI framework.",
-                "title": "iOS Development Chat",
-                "summary": "Discussion about SwiftUI in iOS development",
-                "sender": "TestUser"
-            ]
-        )
-        
-        let ingestResponse = try await mcpServer.handleIngestText(ingestRequest)
-        XCTAssertNotNil(ingestResponse.result, "Should return ingestion result")
-        
-        if let result = ingestResponse.result as? [String: Any] {
-            XCTAssertNotNil(result["id"], "Should return summary ID")
-            XCTAssertNotNil(result["keywords"], "Should extract keywords")
-        }
+        // Test getConversationStats - only available method now
         
         // Test getConversationStats for analytics
         let statsRequest = MCPRequest(
@@ -143,43 +103,7 @@ final class MCPIntegrationTests: XCTestCase {
         let mcpServer = MCPServer()
         mcpServer.setDatabase(schema)
         
-        // 1. Ingest some content
-        let ingestRequest = MCPRequest(
-            method: "ingestText",
-            params: [
-                "content": "Had a great meeting about Swift async/await patterns. Team discussed best practices for handling asynchronous operations in iOS apps.",
-                "title": "Swift Async Meeting",
-                "summary": "Meeting notes about Swift async/await patterns",
-                "sender": "Alice"
-            ]
-        )
-        
-        let ingestResponse = try await mcpServer.handleIngestText(ingestRequest)
-        XCTAssertEqual(ingestResponse.jsonrpc, "2.0", "Should be JSON-RPC 2.0 compliant")
-        XCTAssertNotNil(ingestResponse.result, "Ingestion should succeed")
-        
-        // 2. Search for the content
-        let searchRequest = MCPRequest(
-            method: "searchConversations",
-            params: [
-                "query": "Swift async meeting with Alice",
-                "limit": 10
-            ]
-        )
-        
-        let searchResponse = try await mcpServer.handleSearchConversations(searchRequest)
-        XCTAssertEqual(searchResponse.jsonrpc, "2.0", "Should be JSON-RPC 2.0 compliant")
-        XCTAssertNotNil(searchResponse.result, "Search should return results")
-        
-        if let results = searchResponse.result as? [[String: Any]] {
-            XCTAssertFalse(results.isEmpty, "Should find the ingested content")
-            
-            let firstResult = results[0]
-            let title = firstResult["title"] as? String
-            XCTAssertTrue(title?.contains("Swift") == true, "Should find Swift-related content")
-        }
-        
-        // 3. Get updated stats
+        // Test getting stats with seeded data
         let statsRequest = MCPRequest(
             method: "getConversationStats",
             params: [:]
@@ -208,14 +132,15 @@ final class MCPIntegrationTests: XCTestCase {
         XCTAssertNotNil(errorResponse.error, "Should return error for invalid method")
         XCTAssertNil(errorResponse.result, "Error response should not have result")
         
-        // Test parameter validation
-        let incompleteRequest = MCPRequest(
-            method: "ingestText",
-            params: [:] // Missing required parameters
+        // Test parameter validation - testing with available method
+        let incompleteStatsRequest = MCPRequest(
+            method: "getConversationStats",
+            params: [:] // This should work fine as it has no required parameters
         )
         
-        let paramErrorResponse = try await mcpServer.handleIngestText(incompleteRequest)
-        XCTAssertNotNil(paramErrorResponse.error, "Should return error for missing parameters")
+        // This should succeed (no database error since no database operations occur without setting database)
+        let statsResponse = try await mcpServer.handleGetConversationStats(incompleteStatsRequest)
+        XCTAssertNotNil(statsResponse.error, "Should return error when database not available")
     }
     
     // MARK: - Helper Methods

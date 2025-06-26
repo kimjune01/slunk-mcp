@@ -106,6 +106,8 @@ final class NaturalLanguageQueryTests: XCTestCase {
             intent: .search,
             keywords: ["swift", "programming", "tutorials"],
             entities: [],
+            channels: [],
+            users: [],
             temporalHint: nil
         )
         
@@ -122,6 +124,8 @@ final class NaturalLanguageQueryTests: XCTestCase {
             intent: .search,
             keywords: ["ios", "architecture"],
             entities: [],
+            channels: [],
+            users: [],
             temporalHint: nil
         )
         
@@ -135,6 +139,8 @@ final class NaturalLanguageQueryTests: XCTestCase {
             intent: .search,
             keywords: ["swift"],
             entities: [],
+            channels: [],
+            users: [],
             temporalHint: TemporalHint(type: .relative, value: "yesterday", resolvedDate: yesterday)
         )
         
