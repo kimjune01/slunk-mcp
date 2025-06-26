@@ -5,9 +5,9 @@ import NaturalLanguage
 
 final class SimpleSemanticDemo: XCTestCase {
     
-    func testSimpleSemanticSimilarity() {
+    func testSimpleSemanticSimilarity() async throws {
         print("\n🔬 Simple Semantic Similarity Demonstration")
-        print("=" * 50)
+        print(String(repeating: "=", count: 50))
         
         let embeddingService = EmbeddingService()
         
@@ -25,9 +25,13 @@ final class SimpleSemanticDemo: XCTestCase {
         var embeddings: [(String, [Float])] = []
         
         for phrase in testPhrases {
-            if let embedding = embeddingService.generateEmbedding(for: phrase) {
+            do {
+                let embedding = try await embeddingService.generateEmbedding(for: phrase)
                 embeddings.append((phrase, embedding))
                 print("  ✓ \(phrase) → [\(embedding.count) dimensions]")
+            } catch {
+                print("  ❌ Failed to generate embedding for '\(phrase)': \(error)")
+                continue
             }
         }
         
@@ -73,11 +77,15 @@ final class SimpleSemanticDemo: XCTestCase {
         
         for i in 0..<programmingPhrases.count {
             for j in (i+1)..<programmingPhrases.count {
-                if let emb1 = embeddingService.generateEmbedding(for: programmingPhrases[i]),
-                   let emb2 = embeddingService.generateEmbedding(for: programmingPhrases[j]) {
+                do {
+                    let emb1 = try await embeddingService.generateEmbedding(for: programmingPhrases[i])
+                    let emb2 = try await embeddingService.generateEmbedding(for: programmingPhrases[j])
                     let similarity = cosineSimilarity(emb1, emb2)
                     programmingSimilarities.append(similarity)
                     print("  '\(programmingPhrases[i])' ↔ '\(programmingPhrases[j])': \(Int(similarity * 100))%")
+                } catch {
+                    print("  ❌ Failed to compare embeddings: \(error)")
+                    continue
                 }
             }
         }
@@ -107,8 +115,4 @@ final class SimpleSemanticDemo: XCTestCase {
     }
 }
 
-extension String {
-    static func *(left: String, right: Int) -> String {
-        return String(repeating: left, count: right)
-    }
-}
+// String multiplication operator removed to avoid conflicts

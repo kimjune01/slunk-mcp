@@ -91,12 +91,13 @@ final class NaturalLanguageQueryTests: XCTestCase {
                 keywords: testSummary.keywords
             )
             
-            guard let embedding = embeddingService.generateEmbedding(for: summary.summary) else {
-                XCTFail("Failed to generate embedding")
+            do {
+                let embedding = try await embeddingService.generateEmbedding(for: summary.summary)
+                try await schema.storeSummaryWithEmbedding(summary, embedding: embedding)
+            } catch {
+                XCTFail("Failed to generate embedding: \(error)")
                 continue
             }
-            
-            try await schema.storeSummaryWithEmbedding(summary, embedding: embedding)
         }
         
         // Test semantic similarity using existing vector search
@@ -197,11 +198,12 @@ final class NaturalLanguageQueryTests: XCTestCase {
                 keywords: testItem.keywords
             )
             
-            guard let embedding = embeddingService.generateEmbedding(for: summary.summary) else {
+            do {
+                let embedding = try await embeddingService.generateEmbedding(for: summary.summary)
+                try await schema.storeSummaryWithEmbedding(summary, embedding: embedding)
+            } catch {
                 continue
             }
-            
-            try await schema.storeSummaryWithEmbedding(summary, embedding: embedding)
         }
         
         // Test complex queries like \"planning meetings with Alice from June\"

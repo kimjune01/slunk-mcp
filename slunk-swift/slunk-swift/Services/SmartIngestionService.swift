@@ -48,9 +48,7 @@ actor SmartIngestionService {
         )
         
         // Generate embedding
-        guard let embedding = embeddingService.generateEmbedding(for: textSummary.summary) else {
-            throw IngestionError.embeddingGenerationFailed("Failed to generate embedding for summary")
-        }
+        let embedding = try await embeddingService.generateEmbedding(for: textSummary.summary)
         
         // Store in database
         guard let database = database else {

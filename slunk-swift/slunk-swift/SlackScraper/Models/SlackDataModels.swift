@@ -7,6 +7,7 @@ public struct SlackMessage: Codable, Sendable {
     public let timestamp: Date
     public let sender: String
     public let content: String
+    public let channel: String
     public let threadId: String?
     public let messageType: MessageType
     public let metadata: MessageMetadata?
@@ -16,6 +17,7 @@ public struct SlackMessage: Codable, Sendable {
         timestamp: Date,
         sender: String,
         content: String,
+        channel: String = "general",
         threadId: String? = nil,
         messageType: MessageType = .regular,
         metadata: MessageMetadata? = nil
@@ -24,6 +26,7 @@ public struct SlackMessage: Codable, Sendable {
         self.timestamp = timestamp
         self.sender = sender
         self.content = content
+        self.channel = channel
         self.threadId = threadId
         self.messageType = messageType
         self.metadata = metadata

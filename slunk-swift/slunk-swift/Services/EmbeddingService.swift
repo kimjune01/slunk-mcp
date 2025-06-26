@@ -1,43 +1,51 @@
 import Foundation
 import NaturalLanguage
 
-class EmbeddingService {
+public class EmbeddingService {
     private let nlEmbedding: NLEmbedding?
     
-    init() {
+    public init() {
         // Initialize with sentence embeddings - this provides embeddings
         self.nlEmbedding = NLEmbedding.sentenceEmbedding(for: .english)
     }
     
     // MARK: - Single Text Embedding
     
-    func generateEmbedding(for text: String) -> [Float]? {
+    public func generateEmbedding(for text: String) async throws -> [Float] {
         // Validate input text
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else {
-            return nil
+            throw EmbeddingServiceError.emptyText
         }
         
         // Check if NLEmbedding is available
         guard let nlEmbedding = self.nlEmbedding else {
-            print("EmbeddingService: NLEmbedding not available")
-            return nil
+            throw EmbeddingServiceError.embeddingGenerationFailed("NLEmbedding not available")
         }
         
         // Generate embedding using NLEmbedding
         guard let embedding = nlEmbedding.vector(for: trimmedText) else {
-            print("EmbeddingService: Failed to generate embedding for text")
-            return nil
+            throw EmbeddingServiceError.embeddingGenerationFailed("Failed to generate embedding for text")
         }
         
-        // Convert from [Double] to [Float]
-        return embedding.map { Float($0) }
+        // Convert from [Double] to [Float] and ensure proper dimensions
+        let floatEmbedding = embedding.map { Float($0) }
+        guard floatEmbedding.count == 512 else {
+            throw EmbeddingServiceError.invalidDimensions(floatEmbedding.count)
+        }
+        
+        return floatEmbedding
     }
     
     // MARK: - Batch Processing
     
-    func generateEmbeddings(for texts: [String]) -> [([Float]?)] {
-        return texts.map { generateEmbedding(for: $0) }
+    public func generateEmbeddings(for texts: [String]) async throws -> [[Float]] {
+        var embeddings: [[Float]] = []
+        for text in texts {
+            let embedding = try await generateEmbedding(for: text)
+            embeddings.append(embedding)
+        }
+        return embeddings
     }
 }
 

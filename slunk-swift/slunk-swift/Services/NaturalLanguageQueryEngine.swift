@@ -30,9 +30,7 @@ class NaturalLanguageQueryEngine {
         }
         
         // Generate embedding for semantic search
-        guard let queryEmbedding = embeddingService.generateEmbedding(for: query.originalText) else {
-            throw QueryEngineError.embeddingGenerationFailed
-        }
+        let queryEmbedding = try await embeddingService.generateEmbedding(for: query.originalText)
         
         // Execute hybrid search with combined SQL query
         let results = try await executeHybridSearchSQL(

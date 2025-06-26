@@ -16,55 +16,58 @@ final class EmbeddingServiceTests: XCTestCase {
         super.tearDown()
     }
     
-    func testNLEmbeddingGeneration() {
+    func testNLEmbeddingGeneration() async throws {
         // Should generate 512-dimension vector for text
         let text = "This is a test sentence for embedding generation."
-        let embedding = embeddingService.generateEmbedding(for: text)
+        let embedding = try await embeddingService.generateEmbedding(for: text)
         
-        XCTAssertNotNil(embedding, "Should generate embedding for valid text")
-        XCTAssertEqual(embedding?.count, 512, "Should generate 512-dimension vector")
+        XCTAssertEqual(embedding.count, 512, "Should generate 512-dimension vector")
         
         // Vector values should be within reasonable range for normalized embeddings
-        if let embedding = embedding {
-            for value in embedding {
-                XCTAssertTrue(value >= -1.0 && value <= 1.0, "Embedding values should be normalized between -1 and 1")
-            }
+        for value in embedding {
+            XCTAssertTrue(value >= -1.0 && value <= 1.0, "Embedding values should be normalized between -1 and 1")
         }
     }
     
-    func testNLEmbeddingWithEmptyText() {
-        // Should return nil for empty text
+    func testNLEmbeddingWithEmptyText() async {
+        // Should throw error for empty text
         let emptyText = ""
-        let embedding = embeddingService.generateEmbedding(for: emptyText)
         
-        XCTAssertNil(embedding, "Should return nil for empty text")
+        do {
+            let _ = try await embeddingService.generateEmbedding(for: emptyText)
+            XCTFail("Should throw error for empty text")
+        } catch {
+            // Expected to throw error
+            XCTAssertTrue(true, "Correctly throws error for empty text")
+        }
         
-        // Should also return nil for whitespace-only text
+        // Should also throw error for whitespace-only text
         let whitespaceText = "   \n\t  "
-        let whitespaceEmbedding = embeddingService.generateEmbedding(for: whitespaceText)
         
-        XCTAssertNil(whitespaceEmbedding, "Should return nil for whitespace-only text")
+        do {
+            let _ = try await embeddingService.generateEmbedding(for: whitespaceText)
+            XCTFail("Should throw error for whitespace-only text")
+        } catch {
+            // Expected to throw error
+            XCTAssertTrue(true, "Correctly throws error for whitespace-only text")
+        }
     }
     
-    func testNLEmbeddingConsistency() {
+    func testNLEmbeddingConsistency() async throws {
         // Should be consistent for same input
         let text = "Consistent embedding test text"
-        let embedding1 = embeddingService.generateEmbedding(for: text)
-        let embedding2 = embeddingService.generateEmbedding(for: text)
+        let embedding1 = try await embeddingService.generateEmbedding(for: text)
+        let embedding2 = try await embeddingService.generateEmbedding(for: text)
         
-        XCTAssertNotNil(embedding1)
-        XCTAssertNotNil(embedding2)
-        XCTAssertEqual(embedding1?.count, embedding2?.count)
+        XCTAssertEqual(embedding1.count, embedding2.count)
         
         // Embeddings should be identical for the same input
-        if let emb1 = embedding1, let emb2 = embedding2 {
-            for (index, value) in emb1.enumerated() {
-                XCTAssertEqual(value, emb2[index], accuracy: 0.0001, "Embeddings should be consistent for same input")
-            }
+        for (index, value) in embedding1.enumerated() {
+            XCTAssertEqual(value, embedding2[index], accuracy: 0.0001, "Embeddings should be consistent for same input")
         }
     }
     
-    func testEmbeddingServiceBatchProcessing() {
+    func testEmbeddingServiceBatchProcessing() async throws {
         // Should handle batch processing
         let texts = [
             "First test sentence",
@@ -72,73 +75,77 @@ final class EmbeddingServiceTests: XCTestCase {
             "Third test sentence"
         ]
         
-        let embeddings = embeddingService.generateEmbeddings(for: texts)
+        var embeddings: [[Float]] = []
+        for text in texts {
+            let embedding = try await embeddingService.generateEmbedding(for: text)
+            embeddings.append(embedding)
+        }
         
         XCTAssertEqual(embeddings.count, texts.count, "Should return embedding for each input text")
         
         for embedding in embeddings {
-            XCTAssertNotNil(embedding, "Each embedding should be generated successfully")
-            XCTAssertEqual(embedding?.count, 512, "Each embedding should have 512 dimensions")
+            XCTAssertEqual(embedding.count, 512, "Each embedding should have 512 dimensions")
         }
     }
     
-    func testEmbeddingServiceValidation() {
+    func testEmbeddingServiceValidation() async {
         // Should validate input text
         let validTexts = ["Valid text", "Another valid text"]
         let invalidTexts = ["", "   ", "\n\t"]
         
-        let validEmbeddings = embeddingService.generateEmbeddings(for: validTexts)
-        let invalidEmbeddings = embeddingService.generateEmbeddings(for: invalidTexts)
-        
         // Valid texts should generate embeddings
-        for embedding in validEmbeddings {
-            XCTAssertNotNil(embedding, "Valid text should generate embedding")
+        for validText in validTexts {
+            do {
+                let embedding = try await embeddingService.generateEmbedding(for: validText)
+                XCTAssertEqual(embedding.count, 512, "Valid text should generate 512-dimensional embedding")
+            } catch {
+                XCTFail("Valid text should not throw error: \(error)")
+            }
         }
         
-        // Invalid texts should return nil
-        for embedding in invalidEmbeddings {
-            XCTAssertNil(embedding, "Invalid text should return nil embedding")
+        // Invalid texts should throw errors
+        for invalidText in invalidTexts {
+            do {
+                let _ = try await embeddingService.generateEmbedding(for: invalidText)
+                XCTFail("Invalid text '\(invalidText)' should throw error")
+            } catch {
+                // Expected to throw error
+                XCTAssertTrue(true, "Correctly throws error for invalid text '\(invalidText)'")
+            }
         }
     }
     
-    func testEmbeddingServiceErrorHandling() {
+    func testEmbeddingServiceErrorHandling() async {
         // Should handle NLEmbedding failures gracefully
         // Test with extremely long text that might cause issues
         let veryLongText = String(repeating: "This is a very long text that might cause embedding generation issues. ", count: 1000)
         
-        // Should not crash and should either return a valid embedding or nil
-        let embedding = embeddingService.generateEmbedding(for: veryLongText)
-        
-        if let embedding = embedding {
+        // Should not crash and should either return a valid embedding or handle error gracefully
+        do {
+            let embedding = try await embeddingService.generateEmbedding(for: veryLongText)
             XCTAssertEqual(embedding.count, 512, "If embedding is generated, it should have correct dimensions")
-        } else {
-            // It's acceptable for very long text to return nil if NLEmbedding can't handle it
-            XCTAssertNil(embedding, "It's acceptable to return nil for problematic text")
+        } catch {
+            // It's acceptable for very long text to throw an error if NLEmbedding can't handle it
+            XCTAssertTrue(true, "It's acceptable to throw error for problematic text")
         }
     }
     
-    func testEmbeddingServiceSimilarity() {
+    func testEmbeddingServiceSimilarity() async throws {
         // Test that similar texts produce similar embeddings
         let text1 = "The cat sits on the mat"
         let text2 = "A cat is sitting on a mat"
         let text3 = "The dog runs in the park"
         
-        let embedding1 = embeddingService.generateEmbedding(for: text1)
-        let embedding2 = embeddingService.generateEmbedding(for: text2)
-        let embedding3 = embeddingService.generateEmbedding(for: text3)
+        let embedding1 = try await embeddingService.generateEmbedding(for: text1)
+        let embedding2 = try await embeddingService.generateEmbedding(for: text2)
+        let embedding3 = try await embeddingService.generateEmbedding(for: text3)
         
-        XCTAssertNotNil(embedding1)
-        XCTAssertNotNil(embedding2)
-        XCTAssertNotNil(embedding3)
+        // Calculate cosine similarity
+        let similarity12 = cosineSimilarity(embedding1, embedding2)
+        let similarity13 = cosineSimilarity(embedding1, embedding3)
         
-        if let emb1 = embedding1, let emb2 = embedding2, let emb3 = embedding3 {
-            // Calculate cosine similarity
-            let similarity12 = cosineSimilarity(emb1, emb2)
-            let similarity13 = cosineSimilarity(emb1, emb3)
-            
-            // Similar texts should have higher similarity than dissimilar texts
-            XCTAssertGreaterThan(similarity12, similarity13, "Similar texts should have higher cosine similarity")
-        }
+        // Similar texts should have higher similarity than dissimilar texts
+        XCTAssertGreaterThan(similarity12, similarity13, "Similar texts should have higher cosine similarity")
     }
     
     // Helper function to calculate cosine similarity

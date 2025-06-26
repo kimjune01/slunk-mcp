@@ -31,10 +31,7 @@ final class WorkingRoundTripTest: XCTestCase {
         
         // STEP 2: Generate embedding
         let embeddingService = EmbeddingService()
-        guard let embedding = embeddingService.generateEmbedding(for: summary.summary) else {
-            XCTFail("Failed to generate embedding")
-            return
-        }
+        let embedding = try await embeddingService.generateEmbedding(for: summary.summary)
         
         XCTAssertEqual(embedding.count, 512, "Should generate 512-dimensional embedding")
         print("🧠 Generated embedding with \(embedding.count) dimensions")
@@ -104,10 +101,7 @@ final class WorkingRoundTripTest: XCTestCase {
         
         // STEP 7: Test with a different query
         let queryText = "integration testing workflow"
-        guard let queryEmbedding = embeddingService.generateEmbedding(for: queryText) else {
-            XCTFail("Failed to generate query embedding")
-            return
-        }
+        let queryEmbedding = try await embeddingService.generateEmbedding(for: queryText)
         
         let queryResults = try await db.query("""
             SELECT summary_id, distance
@@ -130,10 +124,7 @@ final class WorkingRoundTripTest: XCTestCase {
             summary: "Database design and optimization techniques"
         )
         
-        guard let embedding2 = embeddingService.generateEmbedding(for: summary2.summary) else {
-            XCTFail("Failed to generate second embedding")
-            return
-        }
+        let embedding2 = try await embeddingService.generateEmbedding(for: summary2.summary)
         
         try await db.execute(
             "INSERT INTO summary_embeddings (embedding, summary_id) VALUES (?, ?)",
@@ -197,22 +188,20 @@ final class WorkingRoundTripTest: XCTestCase {
         
         // Store all summaries
         for (i, (category, content, summary)) in summaries.enumerated() {
-            guard let embedding = embeddingService.generateEmbedding(for: summary) else {
-                XCTFail("Failed to generate embedding for \(category)")
+            do {
+                let embedding = try await embeddingService.generateEmbedding(for: summary)
+                try await db.execute(
+                    "INSERT INTO summary_embeddings (embedding, summary_id) VALUES (?, ?)",
+                    params: [embedding, "\(category)-\(i)"]
+                )
+            } catch {
+                XCTFail("Failed to generate embedding for \(category): \(error)")
                 continue
             }
-            
-            try await db.execute(
-                "INSERT INTO summary_embeddings (embedding, summary_id) VALUES (?, ?)",
-                params: [embedding, "\(category)-\(i)"]
-            )
         }
         
         // Search for programming content
-        guard let programmingQuery = embeddingService.generateEmbedding(for: "software development and programming") else {
-            XCTFail("Failed to generate programming query")
-            return
-        }
+        let programmingQuery = try await embeddingService.generateEmbedding(for: "software development and programming")
         
         let results = try await db.query("""
             SELECT summary_id, distance
