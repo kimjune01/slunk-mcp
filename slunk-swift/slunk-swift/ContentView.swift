@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var serverManager = ServerManager()
     @State private var databaseStats: DatabaseStats?
+    @State private var showingQuitConfirmation = false
     
     var body: some View {
         VStack(spacing: 10) {
@@ -31,11 +32,16 @@ struct ContentView: View {
                 Spacer()
                 
                 Button(action: {
-                    NSApplication.shared.terminate(nil)
+                    showingQuitConfirmation = true
                 }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
+                    Text("QUIT")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(Color.red)
+                        .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
                 .help("Exit application")
@@ -160,6 +166,14 @@ struct ContentView: View {
             if !serverManager.isRunning {
                 serverManager.start()
             }
+        }
+        .alert("Quit Application?", isPresented: $showingQuitConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Quit", role: .destructive) {
+                NSApplication.shared.terminate(nil)
+            }
+        } message: {
+            Text("Are you sure you want to quit the MCP Server?")
         }
     }
     
