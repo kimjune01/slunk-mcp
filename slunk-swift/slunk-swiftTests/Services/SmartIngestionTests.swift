@@ -16,7 +16,7 @@ final class SmartIngestionTests: XCTestCase {
             try? FileManager.default.removeItem(at: tempURL)
         }
         
-        let schema = try SlackDatabaseSchema(databasePath: tempURL.path)
+        let schema = SlackDatabaseSchema(databaseURL: tempURL)
         try await schema.initializeDatabase()
         
         // Test basic database functionality
@@ -27,7 +27,10 @@ final class SmartIngestionTests: XCTestCase {
         print("  ✓ Initial message count: \(initialCount)")
         
         // Test that SlackQueryService can work with the schema
-        let queryService = SlackQueryService()
+        let embeddingService = EmbeddingService()
+        let messageContextualizer = MessageContextualizer(embeddingService: embeddingService)
+        let queryService = SlackQueryService(messageContextualizer: messageContextualizer)
+        await queryService.setDatabase(schema)
         let serviceCount = try await queryService.getMessageCount()
         XCTAssertEqual(serviceCount, 0, "QueryService should also return 0 initially")
         
@@ -47,7 +50,7 @@ final class SmartIngestionTests: XCTestCase {
         
         let startTime = CFAbsoluteTimeGetCurrent()
         
-        let schema = try SlackDatabaseSchema(databasePath: tempURL.path)
+        let schema = SlackDatabaseSchema(databaseURL: tempURL)
         try await schema.initializeDatabase()
         
         let initTime = CFAbsoluteTimeGetCurrent() - startTime
@@ -71,7 +74,7 @@ final class SmartIngestionTests: XCTestCase {
             try? FileManager.default.removeItem(at: tempURL)
         }
         
-        let schema = try SlackDatabaseSchema(databasePath: tempURL.path)
+        let schema = SlackDatabaseSchema(databaseURL: tempURL)
         try await schema.initializeDatabase()
         
         // Verify database schema is ready for Slack data

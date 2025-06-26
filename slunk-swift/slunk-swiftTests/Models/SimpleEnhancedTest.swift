@@ -4,63 +4,75 @@ import Foundation
 
 final class SimpleEnhancedTest: XCTestCase {
     
-    func testBasicEnhancedStorage() async throws {
+    func testBasicSlackStorage() async throws {
         // Create temporary database
         let tempDir = FileManager.default.temporaryDirectory
-        let tempURL = tempDir.appendingPathComponent("simple_enhanced_\(UUID().uuidString).db")
+        let tempURL = tempDir.appendingPathComponent("simple_slack_\(UUID().uuidString).db")
         defer {
             try? FileManager.default.removeItem(at: tempURL)
         }
         
-        let schema = try SQLiteVecSchema(databasePath: tempURL.path)
+        let schema = SlackDatabaseSchema(databaseURL: tempURL)
         try await schema.initializeDatabase()
         
-        // Create a simple TextSummary with enhanced fields
-        let summary = TextSummary(
-            title: "Test Enhanced",
-            content: "This is test content",
-            summary: "Test summary",
+        // Create a simple Slack message
+        let message = SlackMessage(
+            timestamp: Date(),
             sender: "Alice",
-            keywords: ["test", "enhanced"]
+            content: "This is a test message",
+            channel: "general",
+            threadId: nil,
+            messageType: .regular,
+            metadata: SlackMessage.MessageMetadata(
+                editedAt: nil,
+                reactions: [:],
+                mentions: [],
+                attachmentNames: [],
+                contentHash: nil,
+                version: 1
+            )
         )
         
-        print("Created summary with:")
-        print("  ID: \(summary.id)")
-        print("  Sender: \(summary.sender ?? "nil")")
-        print("  Keywords: \(summary.keywords)")
-        print("  Timestamp: \(summary.timestamp)")
+        print("Created message:")
+        print("  ID: \(message.id)")
+        print("  Sender: \(message.sender)")
+        print("  Channel: \(message.channel)")
+        print("  Timestamp: \(message.timestamp)")
         
-        // Create a mock embedding
-        let embedding = Array(repeating: Float(0.5), count: 512)
-        
-        // Try to store it
+        // Process the message
         do {
-            try await schema.storeSummaryWithEmbedding(summary, embedding: embedding)
-            print("✅ Successfully stored summary with embedding")
+            let result = try await schema.processMessage(
+                message,
+                workspace: "test-workspace",
+                channel: "general"
+            )
+            
+            switch result {
+            case .new(let messageId):
+                print("✅ Stored new message with ID: \(messageId)")
+            case .duplicate:
+                print("⚠️ Message was a duplicate")
+            case .updated(let messageId):
+                print("📝 Updated existing message: \(messageId)")
+            case .reactionsUpdated(let messageId):
+                print("🙂 Updated reactions for message: \(messageId)")
+            }
         } catch {
-            XCTFail("Failed to store summary: \(error)")
+            XCTFail("Failed to process message: \(error)")
             return
         }
         
-        // Try to query by date range
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let todayString = dateFormatter.string(from: Date())
-        
+        // Verify storage
         do {
-            let results = try await schema.querySummariesByDateRange(start: todayString, end: todayString)
-            print("✅ Successfully queried \(results.count) summaries")
+            let messageCount = try await schema.getMessageCount()
+            print("✅ Total messages in database: \(messageCount)")
+            XCTAssertEqual(messageCount, 1, "Should have one message")
             
-            if let first = results.first {
-                print("  First result:")
-                print("    Title: \(first.title)")
-                print("    Sender: \(first.sender ?? "nil")")
-                print("    Keywords: \(first.keywords)")
-            }
-            
-            XCTAssertEqual(results.count, 1, "Should find one summary for today")
+            let workspaceCount = try await schema.getWorkspaceCount()
+            print("✅ Total workspaces: \(workspaceCount)")
+            XCTAssertEqual(workspaceCount, 1, "Should have one workspace")
         } catch {
-            XCTFail("Failed to query summaries: \(error)")
+            XCTFail("Failed to query database: \(error)")
         }
     }
 }

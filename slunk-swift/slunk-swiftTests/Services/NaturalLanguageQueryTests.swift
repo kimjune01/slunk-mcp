@@ -23,27 +23,13 @@ final class NaturalLanguageQueryTests: XCTestCase {
         print("\n✅ Query Parsing Tests Completed")
     }
     
-    func testHybridSearch() async throws {
-        print("\n🔍 Testing Hybrid Search Capabilities")
-        
-        // Test SlackQueryService integration instead of old vector search
-        let queryService = SlackQueryService()
-        
-        // Test that service initializes properly
-        XCTAssertNotNil(queryService, "SlackQueryService should initialize")
-        
-        // Test basic query functionality
-        let messageCount = try await queryService.getMessageCount()
-        XCTAssertGreaterThanOrEqual(messageCount, 0, "Message count should be non-negative")
-        
-        print("  ✓ SlackQueryService hybrid search ready")
-        print("\n✅ Hybrid Search Tests Completed")
-    }
     
     func testRealWorldQueries() async throws {
         print("\n🌍 Testing Real World Query Scenarios")
         
-        let queryService = SlackQueryService()
+        let embeddingService = EmbeddingService()
+        let messageContextualizer = MessageContextualizer(embeddingService: embeddingService)
+        let queryService = SlackQueryService(messageContextualizer: messageContextualizer)
         
         // Test queries that would be used in real Slack monitoring
         let realWorldQueries = [

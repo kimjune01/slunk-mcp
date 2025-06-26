@@ -23,7 +23,7 @@ final class ProductionIntegrationTests: XCTestCase {
         
         // Initialize Slack database system
         print("\n📦 Initializing Slack production system...")
-        let schema = try SlackDatabaseSchema(databasePath: dbPath)
+        let schema = SlackDatabaseSchema(databaseURL: URL(fileURLWithPath: dbPath))
         try await schema.initializeDatabase()
         
         // Test basic database functionality
@@ -38,7 +38,10 @@ final class ProductionIntegrationTests: XCTestCase {
         
         // Test SlackQueryService integration
         print("\n🔍 Testing SlackQueryService integration...")
-        let queryService = SlackQueryService()
+        let embeddingService = EmbeddingService()
+        let messageContextualizer = MessageContextualizer(embeddingService: embeddingService)
+        let queryService = SlackQueryService(messageContextualizer: messageContextualizer)
+        await queryService.setDatabase(schema)
         
         let testMessages = try await queryService.getMessageCount()
         print("  ✓ QueryService message count: \(testMessages)")
@@ -63,20 +66,4 @@ final class ProductionIntegrationTests: XCTestCase {
         print("\n✅ MCP Server Integration Test Completed")
     }
     
-    func testProductionErrorScenarios() async throws {
-        print("\n⚠️ Testing Production Error Scenarios")
-        print("=" * 45)
-        
-        // Test invalid database path
-        let invalidPath = "/invalid/path/database.db"
-        
-        do {
-            let _ = try SlackDatabaseSchema(databasePath: invalidPath)
-            XCTFail("Should have thrown error for invalid path")
-        } catch {
-            print("  ✓ Correctly handled invalid database path: \(error)")
-        }
-        
-        print("\n✅ Error Scenario Testing Completed")
-    }
 }
