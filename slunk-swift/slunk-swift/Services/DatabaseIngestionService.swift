@@ -8,7 +8,7 @@ public final class DatabaseIngestionService {
     }
     
     private func log(_ message: String) {
-        print(message)
+        debugPrint(message)
     }
     
     /// Ingest a Slack conversation into the database

@@ -10,7 +10,7 @@ actor SlackElementFinder {
     
     /// Find webArea element using LBAccessibility matchers
     func findWebAreaElement(from applicationElement: Element) async throws -> Element? {
-        print("🔍 SlackUIParser: Searching for webArea element...")
+        debugPrint("🔍 SlackUIParser: Searching for webArea element...")
         
         // First, let's find the main window
         let windowMatcher = Matchers.all([
@@ -23,11 +23,11 @@ actor SlackElementFinder {
             maxDepth: 2,
             deadline: Deadline.fromNow(duration: 2.0)
         ) as? Element else {
-            print("❌ SlackUIParser: No window found")
+            debugPrint("❌ SlackUIParser: No window found")
             return nil
         }
         
-        print("✅ SlackUIParser: Found window")
+        debugPrint("✅ SlackUIParser: Found window")
         
         // Now look for webArea within the window
         let webAreaMatcher = Matchers.hasRole(.webArea)
@@ -39,14 +39,14 @@ actor SlackElementFinder {
         ) as? Element
         
         if webArea == nil {
-            print("❌ SlackUIParser: No webArea found in window")
+            debugPrint("❌ SlackUIParser: No webArea found in window")
             // Let's debug what we can find
             if let children = try window.getChildren() {
-                print("🔍 Window has \(children.count) direct children")
+                debugPrint("🔍 Window has \(children.count) direct children")
                 for (index, child) in children.prefix(5).enumerated() {
                     if let childElement = child as? Element,
                        let role = try? childElement.getAttributeValue(.role) as? Role {
-                        print("  Child \(index): \(role.rawValue)")
+                        debugPrint("  Child \(index): \(role.rawValue)")
                     }
                 }
             }
@@ -62,7 +62,7 @@ actor SlackElementFinder {
         from element: Element, 
         className: String
     ) async throws -> Element? {
-        print("🔍 SlackUIParser: Searching for element with class: \(className)")
+        debugPrint("🔍 SlackUIParser: Searching for element with class: \(className)")
         
         // Use LBAccessibility class matcher
         let classMatcher = Matchers.hasClass(className)
@@ -82,7 +82,7 @@ actor SlackElementFinder {
         role: Role,
         subrole: Subrole? = nil
     ) async throws -> Element? {
-        print("🔍 SlackUIParser: Searching for element with role: \(role)")
+        debugPrint("🔍 SlackUIParser: Searching for element with role: \(role)")
         
         var matchers: [ElementMatcher] = [Matchers.hasRole(role)]
         

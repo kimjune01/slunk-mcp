@@ -60,7 +60,7 @@ public final class SlackMonitoringService: ObservableObject {
         }
         
         // Also print to console
-        print(message)
+        debugPrint(message)
     }
     
     // MARK: - Public API
@@ -414,7 +414,7 @@ public actor SlackAppObserver {
         for app in runningApps {
             if let appName = app.localizedName,
                appName.lowercased().contains("slack") {
-                print("✅ Found Slack app by name: \(appName), PID: \(app.processIdentifier)")
+                debugPrint("✅ Found Slack app by name: \(appName), PID: \(app.processIdentifier)")
                 return AppState(runningApplication: app)
             }
         }

@@ -574,8 +574,10 @@ class MCPServer {
     }
     
     private func logError(_ message: String) {
+        #if DEBUG
         errorHandle.write("[MCP Server] \(message)\n".data(using: .utf8)!)
         fflush(stderr)
+        #endif
     }
     
     // MARK: - Enhanced Error Handling

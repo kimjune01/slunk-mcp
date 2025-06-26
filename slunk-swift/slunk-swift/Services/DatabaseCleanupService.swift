@@ -72,22 +72,22 @@ public final class DatabaseCleanupService: ObservableObject {
     /// Set the database instance to clean up
     func setDatabase(_ database: SlackDatabaseSchema) {
         self.database = database
-        print("📁 Database cleanup service configured with database")
+        debugPrint("📁 Database cleanup service configured with database")
     }
     
     /// Start the periodic cleanup timer
     public func startPeriodicCleanup() {
         guard cleanupEnabled else {
-            print("⏸️ Database cleanup disabled - timer not started")
+            debugPrint("⏸️ Database cleanup disabled - timer not started")
             return
         }
         
         guard cleanupTimer == nil else {
-            print("⚠️ Cleanup timer already running")
+            debugPrint("⚠️ Cleanup timer already running")
             return
         }
         
-        print("⏰ Starting database cleanup timer (checking every hour)")
+        debugPrint("⏰ Starting database cleanup timer (checking every hour)")
         
         // Start timer for hourly checks
         cleanupTimer = Timer.scheduledTimer(withTimeInterval: Self.cleanupInterval, repeats: true) { [weak self] _ in
@@ -107,12 +107,12 @@ public final class DatabaseCleanupService: ObservableObject {
     public func stopPeriodicCleanup() {
         cleanupTimer?.invalidate()
         cleanupTimer = nil
-        print("⏹️ Database cleanup timer stopped")
+        debugPrint("⏹️ Database cleanup timer stopped")
     }
     
     /// Manually trigger cleanup operation
     public func performManualCleanup() async -> CleanupStats {
-        print("🗑️ Manual database cleanup requested")
+        debugPrint("🗑️ Manual database cleanup requested")
         return await performCleanup(isManual: true)
     }
     
@@ -164,17 +164,17 @@ public final class DatabaseCleanupService: ObservableObject {
             return
         }
         
-        print("⏰ Scheduled database cleanup starting")
+        debugPrint("⏰ Scheduled database cleanup starting")
         let stats = await performCleanup(isManual: false)
         
         if stats.messagesDeleted > 0 {
-            print("✅ Scheduled cleanup completed - deleted \(stats.messagesDeleted) old messages")
+            debugPrint("✅ Scheduled cleanup completed - deleted \(stats.messagesDeleted) old messages")
         }
     }
     
     private func performCleanup(isManual: Bool) async -> CleanupStats {
         guard let database = database else {
-            print("⚠️ Cannot perform cleanup - no database configured")
+            debugPrint("⚠️ Cannot perform cleanup - no database configured")
             return CleanupStats(
                 startDate: Date(),
                 endDate: Date(),
@@ -191,10 +191,10 @@ public final class DatabaseCleanupService: ObservableObject {
         let startDate = Date()
         let cutoffDate = getRetentionCutoffDate()
         
-        print("🗑️ Starting database cleanup:")
-        print("   Cutoff date: \(cutoffDate)")
-        print("   Retention period: \(getRetentionDescription())")
-        print("   Manual: \(isManual)")
+        debugPrint("🗑️ Starting database cleanup:")
+        debugPrint("   Cutoff date: \(cutoffDate)")
+        debugPrint("   Retention period: \(getRetentionDescription())")
+        debugPrint("   Manual: \(isManual)")
         
         var stats = CleanupStats(
             startDate: startDate,
@@ -234,18 +234,18 @@ public final class DatabaseCleanupService: ObservableObject {
             cleanupStats = stats
             saveState()
             
-            print("✅ Database cleanup completed:")
-            print("   Messages deleted: \(deletedMessages)")
-            print("   Reactions deleted: \(deletedReactions)")
-            print("   Embeddings deleted: \(deletedEmbeddings)")
-            print("   Space saved: \(formatBytes(spaceSaved))")
-            print("   Duration: \(String(format: "%.2f", stats.duration))s")
+            debugPrint("✅ Database cleanup completed:")
+            debugPrint("   Messages deleted: \(deletedMessages)")
+            debugPrint("   Reactions deleted: \(deletedReactions)")
+            debugPrint("   Embeddings deleted: \(deletedEmbeddings)")
+            debugPrint("   Space saved: \(formatBytes(spaceSaved))")
+            debugPrint("   Duration: \(String(format: "%.2f", stats.duration))s")
             
         } catch {
             stats.error = error.localizedDescription
             stats.endDate = Date()
             
-            print("❌ Database cleanup failed: \(error.localizedDescription)")
+            debugPrint("❌ Database cleanup failed: \(error.localizedDescription)")
         }
         
         return stats
@@ -394,13 +394,13 @@ extension DatabaseCleanupService {
     /// Set retention period in months
     public func setRetentionMonths(_ months: Int) {
         retentionPeriod = TimeInterval(months * 30 * 24 * 60 * 60)
-        print("📅 Retention period set to \(months) months")
+        debugPrint("📅 Retention period set to \(months) months")
     }
     
     /// Set retention period in days
     public func setRetentionDays(_ days: Int) {
         retentionPeriod = TimeInterval(days * 24 * 60 * 60)
-        print("📅 Retention period set to \(days) days")
+        debugPrint("📅 Retention period set to \(days) days")
     }
     
     /// Get estimated messages that would be deleted in next cleanup
@@ -417,7 +417,7 @@ extension DatabaseCleanupService {
             }
             return count
         } catch {
-            print("⚠️ Failed to estimate deletion count: \(error)")
+            debugPrint("⚠️ Failed to estimate deletion count: \(error)")
             return 0
         }
     }

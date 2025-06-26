@@ -266,3 +266,22 @@ class PerformanceTimer {
         )
     }
 }
+
+// MARK: - Global Debug Logging Functions
+
+/// Print debug information only in DEBUG builds
+/// This prevents debug logs from interfering with MCP JSON-RPC communication
+func debugPrint(_ items: Any..., separator: String = " ", terminator: String = "\n") {
+    #if DEBUG
+    let output = items.map { "\($0)" }.joined(separator: separator)
+    print(output, terminator: terminator)
+    #endif
+}
+
+/// Log an error to stderr (file handle 2) which doesn't interfere with stdout
+func logError(_ message: String) {
+    let errorHandle = FileHandle.standardError
+    if let data = "\(message)\n".data(using: .utf8) {
+        errorHandle.write(data)
+    }
+}

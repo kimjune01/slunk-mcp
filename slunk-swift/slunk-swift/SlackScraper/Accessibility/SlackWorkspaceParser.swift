@@ -10,40 +10,40 @@ actor SlackWorkspaceParser {
     
     /// Extract workspace name from element
     func extractWorkspaceName(from element: Element) async throws -> String? {
-        print("🔍 SlackWorkspaceParser: Extracting workspace name...")
+        debugPrint("🔍 SlackWorkspaceParser: Extracting workspace name...")
         
         // Debug: Print all available attributes
         let attributes: [Attribute] = [.title, .description, .value, .help]
         for attr in attributes {
             if let value = try? element.getAttributeValue(attr) as? String {
-                print("   📊 \(attr): '\(value)'")
+                debugPrint("   📊 \(attr): '\(value)'")
             }
         }
         
         // Try to get workspace from window title or element attributes
         if let title = try element.getAttributeValue(.title) as? String {
-            print("   🔍 Found title: '\(title)'")
+            debugPrint("   🔍 Found title: '\(title)'")
             let parsed = parseWorkspaceFromTitle(title)
-            print("   🔍 Parsed workspace: '\(parsed ?? "nil")'")
+            debugPrint("   🔍 Parsed workspace: '\(parsed ?? "nil")'")
             return parsed
         }
         
         // Try description attribute
         if let description = try element.getAttributeValue(.description) as? String {
-            print("   🔍 Found description: '\(description)'")
+            debugPrint("   🔍 Found description: '\(description)'")
             return parseWorkspaceFromTitle(description)
         }
         
         // Try to find workspace info in children
         if let children = try element.getChildren() {
-            print("   🔍 Checking \(children.count) children for workspace info...")
+            debugPrint("   🔍 Checking \(children.count) children for workspace info...")
             for (index, child) in children.prefix(5).enumerated() {
                 if let childElement = child as? Element {
                     if let value = try? childElement.getValue() {
-                        print("   📊 Child \(index) value: '\(value)'")
+                        debugPrint("   📊 Child \(index) value: '\(value)'")
                     }
                     if let title = try? childElement.getAttributeValue(.title) as? String {
-                        print("   📊 Child \(index) title: '\(title)'")
+                        debugPrint("   📊 Child \(index) title: '\(title)'")
                     }
                 }
             }
@@ -66,7 +66,7 @@ actor SlackWorkspaceParser {
             deadline: Deadline.fromNow(duration: 1.0)
         ) as? Element {
             if let windowTitle = try window.getAttributeValue(.title) as? String {
-                print("🔍 SlackWorkspaceParser: Window title: '\(windowTitle)'")
+                debugPrint("🔍 SlackWorkspaceParser: Window title: '\(windowTitle)'")
                 return parseWorkspaceFromTitle(windowTitle)
             }
         }
@@ -76,7 +76,7 @@ actor SlackWorkspaceParser {
     
     /// Find workspace switcher element and extract workspace name
     func extractWorkspaceFromSwitcher(_ webAreaElement: Element) async throws -> String? {
-        print("🔍 SlackWorkspaceParser: Looking for workspace switcher...")
+        debugPrint("🔍 SlackWorkspaceParser: Looking for workspace switcher...")
         let switcherMatcher = Matchers.hasClassContaining("p-workspace_switcher")
         
         if let switcher = try await webAreaElement.findElement(
@@ -85,7 +85,7 @@ actor SlackWorkspaceParser {
             deadline: Deadline.fromNow(duration: 2.0)
         ) {
             let workspace = try switcher.getValue()
-            print("   ✅ Found workspace from switcher: '\(workspace ?? "nil")'")
+            debugPrint("   ✅ Found workspace from switcher: '\(workspace ?? "nil")'")
             return workspace
         }
         
@@ -96,25 +96,25 @@ actor SlackWorkspaceParser {
     
     /// Extract channel name from content list element
     func extractChannelName(from element: Element) async throws -> String? {
-        print("🔍 SlackWorkspaceParser: Extracting channel name...")
+        debugPrint("🔍 SlackWorkspaceParser: Extracting channel name...")
         
         // Debug: Print element attributes
         if let description = try element.getAttributeValue(.description) as? String {
-            print("   📊 Content list description: '\(description)'")
+            debugPrint("   📊 Content list description: '\(description)'")
             if !description.isEmpty {
                 return description
             }
         }
         
         if let title = try element.getAttributeValue(.title) as? String {
-            print("   📊 Content list title: '\(title)'")
+            debugPrint("   📊 Content list title: '\(title)'")
             if !title.isEmpty {
                 return title
             }
         }
         
         // Try to find channel info in various ways
-        print("   🔍 Looking for channel header elements...")
+        debugPrint("   🔍 Looking for channel header elements...")
         
         // Look for elements with channel-related classes
         let channelMatchers = [
@@ -131,7 +131,7 @@ actor SlackWorkspaceParser {
                 deadline: Deadline.fromNow(duration: 2.0)
             ) {
                 if let value = try headerElement.getValue() {
-                    print("   ✅ Found channel via matcher \(index): '\(value)'")
+                    debugPrint("   ✅ Found channel via matcher \(index): '\(value)'")
                     return value
                 }
             }
@@ -139,14 +139,14 @@ actor SlackWorkspaceParser {
         
         // Try to find any text in the first few children
         if let children = try element.getChildren() {
-            print("   🔍 Checking first children for channel info...")
+            debugPrint("   🔍 Checking first children for channel info...")
             for (index, child) in children.prefix(10).enumerated() {
                 if let childElement = child as? Element {
                     if let value = try? childElement.getValue(), !value.isEmpty {
-                        print("   📊 Child \(index) text: '\(value)'")
+                        debugPrint("   📊 Child \(index) text: '\(value)'")
                         // Look for channel patterns
                         if value.hasPrefix("#") || value.hasPrefix("@") {
-                            print("   ✅ Found channel name: '\(value)'")
+                            debugPrint("   ✅ Found channel name: '\(value)'")
                             return value
                         }
                     }
@@ -164,7 +164,7 @@ actor SlackWorkspaceParser {
         if let viewContentsDescription = try viewContents.getAttributeValue(.description) as? String {
             let isThreadView = viewContentsDescription == "Threads"
             if isThreadView {
-                print("✅ THREAD VIEW DETECTED")
+                debugPrint("✅ THREAD VIEW DETECTED")
             }
             return isThreadView
         }
@@ -191,7 +191,7 @@ actor SlackWorkspaceParser {
     
     /// Parse workspace name from title string
     private func parseWorkspaceFromTitle(_ title: String) -> String? {
-        print("🔍 SlackWorkspaceParser: Parsing workspace from title: '\(title)'")
+        debugPrint("🔍 SlackWorkspaceParser: Parsing workspace from title: '\(title)'")
         
         // Common patterns:
         // 1. "js-help (Channel) - LangChain Community - Slack" (your current format)
@@ -206,12 +206,12 @@ actor SlackWorkspaceParser {
             if let lastDashRange = beforeSlack.range(of: " - ", options: .backwards) {
                 let workspaceStart = lastDashRange.upperBound
                 let workspace = String(title[workspaceStart..<endRange.lowerBound])
-                print("   ✅ Parsed workspace (pattern 1): '\(workspace)'")
+                debugPrint("   ✅ Parsed workspace (pattern 1): '\(workspace)'")
                 return workspace
             } else {
                 // Only one part before " - Slack"
                 let workspace = String(beforeSlack)
-                print("   ✅ Parsed workspace (pattern 1b): '\(workspace)'")
+                debugPrint("   ✅ Parsed workspace (pattern 1b): '\(workspace)'")
                 return workspace
             }
         }
@@ -221,12 +221,12 @@ actor SlackWorkspaceParser {
             let parts = title.split(separator: "|").map { $0.trimmingCharacters(in: .whitespaces) }
             if parts.count >= 2 {
                 let workspace = parts[1]
-                print("   ✅ Parsed workspace (pattern 2): '\(workspace)'")
+                debugPrint("   ✅ Parsed workspace (pattern 2): '\(workspace)'")
                 return workspace
             }
         }
         
-        print("   ❌ Could not parse workspace from title")
+        debugPrint("   ❌ Could not parse workspace from title")
         return nil
     }
 }

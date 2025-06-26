@@ -5,6 +5,24 @@ import AppKit
 struct slunk_swiftApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    init() {
+        // Check if we should run as MCP server
+        let args = CommandLine.arguments
+        let isMCPMode = args.contains("--mcp") || ProcessInfo.processInfo.environment["MCP_MODE"] != nil
+        
+        if isMCPMode {
+            // Run as MCP server only
+            let mcpServer = MCPServer()
+            mcpServer.start()
+            
+            // Keep the app running
+            RunLoop.main.run()
+            
+            // Exit to prevent GUI from starting
+            exit(0)
+        }
+    }
+    
     var body: some Scene {
         Settings {
             EmptyView()
@@ -15,7 +33,6 @@ struct slunk_swiftApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var popover: NSPopover?
-    let mcpServer = MCPServer()
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide the app from the dock
@@ -30,8 +47,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.target = self
         }
         
-        // Start services
-        mcpServer.start()
+        // Start monitoring service only (MCP server runs separately)
         Task {
             await SlackMonitoringService.shared.startMonitoring()
         }

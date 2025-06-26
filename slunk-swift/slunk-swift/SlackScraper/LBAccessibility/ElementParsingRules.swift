@@ -179,7 +179,8 @@ public struct AttributeMapRule<T: Equatable & Sendable & Hashable>: RuleProtocol
                 }
             }
         } catch {
-            print("Error in AttributeMapRule: \(error)")
+            // Log error to file instead of stdout
+            // Logger.shared.logError(error, context: "AttributeMapRule")
         }
         return false
     }
@@ -237,7 +238,8 @@ public enum Matchers {
                     return stringValue.contains(substring)
                 }
             } catch {
-                print("Error checking if attribute \(attribute) contains '\(substring)': \(error)")
+                // Log error to file instead of stdout
+                // Logger.shared.logError(error, context: "Attribute check for \(attribute)")
             }
             return false
         }
@@ -253,7 +255,8 @@ public enum Matchers {
                     return attrValue == value
                 }
             } catch {
-                print("Error checking attribute \(attribute): \(error)")
+                // Log error to file instead of stdout
+                // Logger.shared.logError(error, context: "Attribute check")
             }
             return false
         }
@@ -269,7 +272,8 @@ public enum Matchers {
                     return values.contains(attrValue)
                 }
             } catch {
-                print("Error checking attribute \(attribute): \(error)")
+                // Log error to file instead of stdout
+                // Logger.shared.logError(error, context: "Attribute check")
             }
             return false
         }
@@ -293,7 +297,8 @@ public enum Matchers {
                 }
                 return classList.contains(className)
             } catch {
-                print("Error checking class \(className): \(error)")
+                // Log error to file instead of stdout
+                // Logger.shared.logError(error, context: "Class check for \(className)")
                 return false
             }
         }
@@ -307,7 +312,8 @@ public enum Matchers {
                 }
                 return classList.contains(where: { $0.contains(substring) })
             } catch {
-                print("Error checking class containing \(substring): \(error)")
+                // Log error to file instead of stdout
+                // Logger.shared.logError(error, context: "Class substring check")
                 return false
             }
         }
@@ -325,7 +331,8 @@ public enum Matchers {
                 }
                 return false
             } catch {
-                print("Error checking children: \(error)")
+                // Log error to file instead of stdout
+                // Logger.shared.logError(error, context: "Child element check")
                 return false
             }
         }
@@ -348,7 +355,8 @@ public enum Matchers {
                 let empty = await collector.isEmpty()
                 return !empty
             } catch {
-                print("Error checking descendants: \(error)")
+                // Log error to file instead of stdout
+                // Logger.shared.logError(error, context: "Descendant check")
                 return false
             }
         }

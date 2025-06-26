@@ -12,13 +12,44 @@ struct ContentView: View {
     @State private var databaseStats: DatabaseStats?
     @State private var showingQuitConfirmation = false
     
+    var buildConfiguration: String {
+        #if DEBUG
+        return "DEBUG"
+        #else
+        return "RELEASE"
+        #endif
+    }
+    
+    var buildConfigurationColor: Color {
+        #if DEBUG
+        return .orange
+        #else
+        return .green
+        #endif
+    }
+    
     var body: some View {
         VStack(spacing: 10) {
             // Header with title and exit button
             HStack {
-                Text("MCP Server")
-                    .font(.title2)
-                    .fontWeight(.medium)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("MCP Server")
+                        .font(.title2)
+                        .fontWeight(.medium)
+                    
+                    // Build configuration indicator
+                    Text(buildConfiguration)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(buildConfigurationColor.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .strokeBorder(buildConfigurationColor.opacity(0.5), lineWidth: 1)
+                        )
+                        .cornerRadius(4)
+                }
                 
                 HStack(spacing: 4) {
                     Circle()
@@ -159,7 +190,7 @@ struct ContentView: View {
             
         }
         .padding(12)
-        .frame(width: 400, height: 280)
+        .frame(width: 400, height: 290)
         .onAppear {
             refreshDatabaseStats()
             // Auto-start MCP server
@@ -188,7 +219,7 @@ struct ContentView: View {
                     self.databaseStats = stats
                 }
             } catch {
-                print("Failed to get database stats: \(error)")
+                debugPrint("Failed to get database stats: \(error)")
                 // Set fallback stats on error
                 await MainActor.run {
                     self.databaseStats = DatabaseStats(
