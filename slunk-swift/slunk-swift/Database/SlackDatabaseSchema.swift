@@ -20,8 +20,11 @@ public class SlackDatabaseSchema {
         // Configure database for concurrent access
         var config = GRDB.Configuration()
         config.prepareDatabase { db in
-            // Enable WAL mode for better concurrency
-            try db.execute(sql: "PRAGMA journal_mode = WAL")
+            // Check if already in WAL mode before setting to avoid lock conflicts
+            let currentMode = try String.fetchOne(db, sql: "PRAGMA journal_mode") ?? ""
+            if currentMode.uppercased() != "WAL" {
+                try db.execute(sql: "PRAGMA journal_mode = WAL")
+            }
             // Set busy timeout to handle concurrent access
             try db.execute(sql: "PRAGMA busy_timeout = 30000") // 30 seconds
         }
@@ -52,7 +55,23 @@ public class SlackDatabaseSchema {
     }
     
     private func openDatabase() throws {
-        database = try DatabaseQueue(path: databaseURL.path, configuration: databaseConfig)
+        var retryCount = 0
+        let maxRetries = 3
+        
+        while retryCount < maxRetries {
+            do {
+                database = try DatabaseQueue(path: databaseURL.path, configuration: databaseConfig)
+                return
+            } catch {
+                if error.localizedDescription.contains("database is locked") && retryCount < maxRetries - 1 {
+                    // Wait briefly and retry
+                    Thread.sleep(forTimeInterval: 0.1 * Double(retryCount + 1)) // 100ms, 200ms, 300ms
+                    retryCount += 1
+                    continue
+                }
+                throw error
+            }
+        }
     }
     
     private func closeDatabase() {
@@ -80,22 +99,20 @@ public class SlackDatabaseSchema {
     
     // MARK: - Connection Management
     
-    /// Opens a temporary database connection for operations
+    /// Uses the main database connection for operations to avoid lock conflicts
     private func withDatabaseConnection<T>(_ operation: (DatabaseQueue) async throws -> T) async throws -> T {
-        let db = try DatabaseQueue(path: databaseURL.path, configuration: databaseConfig)
-        defer { 
-            // Connection is automatically closed when db goes out of scope
+        guard let database = database else {
+            throw SlackDatabaseError.databaseNotOpen
         }
-        return try await operation(db)
+        return try await operation(database)
     }
     
-    /// Legacy method for read operations - now uses temporary connection
+    /// Legacy method for read operations - now uses main database connection
     private func withDatabase<T>(_ operation: (DatabaseQueue) throws -> T) throws -> T {
-        let db = try DatabaseQueue(path: databaseURL.path, configuration: databaseConfig)
-        defer { 
-            // Connection is automatically closed when db goes out of scope
+        guard let database = database else {
+            throw SlackDatabaseError.databaseNotOpen
         }
-        return try operation(db)
+        return try operation(database)
     }
     
     // MARK: - Table Creation

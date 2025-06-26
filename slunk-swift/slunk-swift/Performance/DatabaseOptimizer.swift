@@ -13,8 +13,8 @@ class DatabaseOptimizer {
         
         // Apply SQLite PRAGMA optimizations
         let optimizations = [
-            // WAL mode for better concurrency
-            "PRAGMA journal_mode = WAL",
+            // Note: WAL mode is already set during database initialization
+            // to avoid lock conflicts, we don't set it again here
             
             // Increase cache size (negative value = KB, positive = pages)
             "PRAGMA cache_size = -64000", // 64MB cache
