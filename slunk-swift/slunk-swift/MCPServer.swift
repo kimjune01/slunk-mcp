@@ -181,6 +181,9 @@ class MCPServer {
     private var queryEngine: NaturalLanguageQueryEngine?
     private var smartIngestion: SmartIngestionService?
     private var conversationalSearch: ConversationalSearchService?
+    private var database: SlackDatabaseSchema?
+    private var queryService: SlackQueryService?
+    private var messageContextualizer: MessageContextualizer?
     
     init() {
         setupHandlers()
@@ -191,6 +194,9 @@ class MCPServer {
         self.queryEngine = NaturalLanguageQueryEngine()
         self.smartIngestion = SmartIngestionService()
         
+        // Database is initialized via ProductionService in the main app startup
+        logError("🔧 MCP server components initialized. Database connection will be established via ProductionService.")
+        
         // Set up conversational search after query engine is created
         if let queryEngine = self.queryEngine {
             let embeddingService = EmbeddingService()
@@ -198,6 +204,9 @@ class MCPServer {
                 queryEngine: queryEngine,
                 embeddingService: embeddingService
             )
+            
+            // Initialize message contextualizer
+            self.messageContextualizer = MessageContextualizer(embeddingService: embeddingService)
         }
     }
     
@@ -298,45 +307,45 @@ class MCPServer {
     private func handleToolsList(_ request: JSONRPCRequest) -> JSONRPCResponse {
         // Tool Selection Guide for LLM Agents
         let toolSelectionGuide = """
-        SLACK SEARCH TOOL SELECTION GUIDE:
+        🎯 SLACK SEARCH TOOL QUICK REFERENCE
         
-        QUICK DECISION TREE:
-        • Simple queries ("find X", "show me Y") → searchConversations
-        • Need specific filters (channels, users, dates) → search_messages  
-        • Complex/multi-part queries → intelligent_search
-        • Following up previous search → conversational_search
-        • Understanding cryptic messages → get_message_context
-        • Analyzing trends/patterns → discover_patterns
+        START HERE:
+        └─ General search? → searchConversations
+           └─ Too many results? → search_messages (add filters)
+           └─ Too few results? → intelligent_search (smarter parsing)
+           └─ Want more? → suggest_related
         
-        COMMON QUERY PATTERNS:
-        • "What did [person] say about [topic]?" → search_messages (user filter)
-        • "Catch me up on [channel]" → search_messages (channel + recent dates)
-        • "Find decisions about [topic]" → intelligent_search (understands decision language)
-        • "What's been discussed lately?" → discover_patterns (time_range="week")
-        • "I don't understand this message" → get_message_context
+        BY USE CASE:
+        • "What did X say?" → search_messages + user filter
+        • "Catch me up" → search_messages + channel/date filters  
+        • "How did we decide?" → intelligent_search
+        • "What's trending?" → discover_patterns
+        • "What does 👍 mean?" → get_message_context
+        • "Show me the thread" → get_thread_context
+        • "Tell me more" → conversational_search
         
-        SEARCH STRATEGY FOR NO/TOO MANY RESULTS:
-        1. Start broad with searchConversations
-        2. If >50 results → search_messages with filters
-        3. If 0 results → intelligent_search with expanded keywords
-        4. Use suggest_related to find adjacent topics
+        CHAINING STRATEGY:
+        1. discover_patterns → Find what to search
+        2. searchConversations → Get overview
+        3. search_messages → Drill down with filters
+        4. get_thread_context → Read full discussions
+        5. suggest_related → Find more
         
-        RESULT INTERPRETATION:
-        • Scores >0.8 = highly relevant
-        • Scores 0.5-0.8 = somewhat relevant  
-        • Scores <0.5 = loosely related
-        • Empty results = try broader keywords or longer time range
+        💡 TIPS:
+        • Message IDs look like: 1750947252.454503
+        • Dates use ISO 8601: 2024-03-15T00:00:00Z
+        • Empty query in search_messages = filter only
         """
         
         let tools: [[String: Any]] = [
             [
                 "name": "searchConversations",
-                "description": "Search through Slack conversations using natural language. Finds relevant messages and conversations based on meaning, keywords, people mentioned, and time periods. Use this when you need to find specific discussions, topics, or information from Slack history. Examples: 'Find discussions about iOS development from last week' or 'Show conversations with Alice about project deadlines'.",
+                "description": "BEST FOR: Quick natural language searches across all Slack messages. Understands context and meaning, not just keywords. Returns message summaries with relevance scores. USE WHEN: Starting a search, finding discussions by topic, or when you don't know exact channels/users. RETURNS: Array of {id, title, summary, sender, timestamp, score, matchedKeywords}. TIP: Start here for any search task.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "query": ["type": "string", "description": "Your search in plain English. Be natural and specific. Examples: 'Swift meetings with Alice from last week', 'bug reports about login issues', 'decisions made in #product channel this month'"],
-                        "limit": ["type": "integer", "description": "Maximum number of results to return", "default": 10]
+                        "query": ["type": "string", "description": "Natural language search query. Be conversational. Examples: 'discussions about the API redesign last week', 'what did John say about the deployment issue?', 'customer feedback from March'"],
+                        "limit": ["type": "integer", "description": "Max results to return (1-50)", "default": 10, "minimum": 1, "maximum": 50]
                     ],
                     "required": ["query"]
                 ]
@@ -344,41 +353,41 @@ class MCPServer {
             // Phase 2: Contextual Search Tools
             [
                 "name": "search_messages",
-                "description": "Advanced Slack message search with precise filtering options. Use this for detailed queries with specific constraints like channel names, user names, date ranges, or search modes. Better than searchConversations when you need exact filtering. Examples: 'Search for messages in #engineering channel from user John between March 1-15' or 'Find messages containing API mentions using semantic search mode'.",
+                "description": "BEST FOR: Precise searches with filters by channel, user, or date range. Returns full message content with metadata. USE WHEN: You know specific channels/users, need messages from a date range, or searchConversations gave too many results. RETURNS: Array of {id, workspace, channel, sender, content, timestamp, threadId}. TIP: Combine multiple filters for surgical precision.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "query": ["type": "string", "description": "What you want to search for. Can be keywords, phrases, or natural language. Examples: 'API documentation', 'server down', 'team meeting notes'"],
-                        "channels": ["type": "array", "items": ["type": "string"], "description": "Filter by specific channels. Format: ['#engineering', 'general'] or ['engineering', 'general'] (# optional)"],
-                        "users": ["type": "array", "items": ["type": "string"], "description": "Filter by specific users. Format: ['@alice', 'bob'] or ['alice', 'bob'] (@ optional)"],
-                        "start_date": ["type": "string", "description": "Start date in ISO 8601 format. Examples: '2024-03-15', '2024-03-15T14:30:00Z', or relative like 'last week'"],
-                        "end_date": ["type": "string", "description": "End date in ISO 8601 format. Examples: '2024-03-20', '2024-03-20T18:00:00Z', or 'now'"],
-                        "search_mode": ["type": "string", "enum": ["semantic", "structured", "hybrid"], "default": "hybrid"],
-                        "limit": ["type": "integer", "default": 10, "minimum": 1, "maximum": 100]
+                        "query": ["type": "string", "description": "Search text (can be empty string to filter by other criteria). Examples: 'deployment', 'bug fix', 'meeting notes', ''"],
+                        "channels": ["type": "array", "items": ["type": "string"], "description": "Channel names to search in. Examples: ['engineering', 'general'], ['#product-team']"],
+                        "users": ["type": "array", "items": ["type": "string"], "description": "User names who sent messages. Examples: ['alice', 'bob'], ['@john.doe']"],
+                        "start_date": ["type": "string", "description": "ISO 8601 date-time. Examples: '2024-03-15T00:00:00Z', '2024-03-15T14:30:00-07:00'"],
+                        "end_date": ["type": "string", "description": "ISO 8601 date-time. Examples: '2024-03-20T23:59:59Z', '2024-03-20T18:00:00-07:00'"],
+                        "search_mode": ["type": "string", "enum": ["semantic", "structured", "hybrid"], "default": "hybrid", "description": "semantic=meaning-based, structured=exact match, hybrid=both"],
+                        "limit": ["type": "integer", "default": 20, "minimum": 1, "maximum": 100]
                     ],
                     "required": ["query"]
                 ]
             ],
             [
                 "name": "get_thread_context", 
-                "description": "Extract complete thread conversation with context enhancement",
+                "description": "BEST FOR: Retrieving complete thread conversations with all replies. Enhances short messages with contextual meaning. USE WHEN: You have a thread_id from search results and want the full conversation, or investigating a specific discussion thread. RETURNS: {threadId, parentMessage, messages[], contextualMeanings[], participants[], messageCount, timespan}. TIP: Thread IDs look like '1234567890.123456'.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "thread_id": ["type": "string", "description": "Thread identifier"],
-                        "include_context": ["type": "boolean", "default": true, "description": "Include contextual meaning for short messages"]
+                        "thread_id": ["type": "string", "description": "Slack thread timestamp ID. Example: '1750947252.454503'"],
+                        "include_context": ["type": "boolean", "default": true, "description": "Enhance short messages/emojis with meaning"]
                     ],
                     "required": ["thread_id"]
                 ]
             ],
             [
                 "name": "get_message_context",
-                "description": "Get contextual meaning for short messages (emoji, abbreviations, etc.)",
+                "description": "BEST FOR: Understanding cryptic messages, emojis, or abbreviations by analyzing surrounding context. USE WHEN: A message is unclear (e.g., just '👍' or 'lgtm'), you need the full thread a message belongs to, or want enhanced meaning. RETURNS: {originalMessage, contextualMeaning, threadContext, enhancement}. TIP: Especially useful for short reactions or acronyms.",
                 "inputSchema": [
                     "type": "object", 
                     "properties": [
-                        "message_id": ["type": "string", "description": "Message identifier"],
-                        "include_thread": ["type": "boolean", "default": true, "description": "Include thread context"]
+                        "message_id": ["type": "string", "description": "Slack message ID. Example: '1750947252.454503'"],
+                        "include_thread": ["type": "boolean", "default": true, "description": "Include full thread context if message is in thread"]
                     ],
                     "required": ["message_id"]
                 ]
@@ -386,67 +395,68 @@ class MCPServer {
             // Phase 3: Advanced Query Processing Tools
             [
                 "name": "parse_natural_query",
-                "description": "Parse natural language queries to extract intent, entities, and temporal hints",
+                "description": "BEST FOR: Understanding what a user is asking for before searching. Extracts channels, users, dates, and intent from natural language. USE WHEN: You want to understand a complex query before executing it, or building advanced search workflows. RETURNS: {intent, keywords[], channels[], users[], entities[], temporalHint}. TIP: Use this to pre-process queries for other tools.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "query": ["type": "string", "description": "Natural language query to parse"],
-                        "include_entities": ["type": "boolean", "default": true, "description": "Include entity extraction"],
-                        "include_temporal": ["type": "boolean", "default": true, "description": "Include temporal hint extraction"]
+                        "query": ["type": "string", "description": "Natural language to analyze. Example: 'what did @alice say in #engineering about the API last week?'"],
+                        "include_entities": ["type": "boolean", "default": true, "description": "Extract people, channels, topics"],
+                        "include_temporal": ["type": "boolean", "default": true, "description": "Extract time references (yesterday, last week, etc)"]
                     ],
                     "required": ["query"]
                 ]
             ],
             [
                 "name": "intelligent_search",
-                "description": "The most advanced search tool that combines natural language processing with smart contextual understanding. Automatically parses your query, understands intent, and executes the best search strategy. Use this for complex, multi-faceted queries or when other search tools aren't sufficient. Perfect for questions involving decisions, opinions, conclusions, or cause-and-effect relationships. Example: 'Find technical discussions that led to decisions about the mobile app architecture changes'. WORKFLOW TIP: Use after simpler searches fail or for analytical queries.",
+                "description": "BEST FOR: Complex analytical queries that need deep understanding. Automatically extracts intent, entities, and executes multi-step search strategies. USE WHEN: Other searches fail, need to find cause-effect relationships, decisions, or opinions. RETURNS: {query, parsedIntent, results[], extractedKeywords[], extractedEntities[]}. TIP: This is your power tool for 'why' and 'how' questions.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "query": ["type": "string", "description": "Natural language search query"],
-                        "context": ["type": "string", "description": "Optional context from previous searches"],
-                        "refine_previous": ["type": "boolean", "default": false, "description": "Refine previous search results"],
-                        "limit": ["type": "integer", "default": 10, "minimum": 1, "maximum": 50]
+                        "query": ["type": "string", "description": "Complex question. Examples: 'How did we decide to migrate to Kubernetes?', 'What concerns were raised about the new pricing model?'"],
+                        "context": ["type": "string", "description": "Previous search context to build upon"],
+                        "refine_previous": ["type": "boolean", "default": false, "description": "Narrow down previous results"],
+                        "limit": ["type": "integer", "default": 15, "minimum": 1, "maximum": 50]
                     ],
                     "required": ["query"]
                 ]
             ],
             [
                 "name": "discover_patterns",
-                "description": "Analyze Slack data to find recurring topics, communication patterns, and trends over time. Discovers who talks about what, when people are most active, and what topics come up frequently. Use for insights about team communication, popular discussion topics, or activity patterns. Perfect for questions like 'What has the team been focused on?', 'Who are the most active contributors?', or 'When do people typically discuss technical issues?'. ANALYTICS TIP: Great starting point for understanding team dynamics before diving into specific searches.",
+                "description": "BEST FOR: Understanding team dynamics, trending topics, and communication patterns without specific search terms. USE WHEN: Starting research, understanding what's important to the team, or finding active discussion areas. RETURNS: {patterns: {topics[], participants[], communication[]}, timeRange, analysisDate}. TIP: Run this first to discover what to search for.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "time_range": ["type": "string", "enum": ["day", "week", "month", "all"], "default": "week"],
-                        "pattern_type": ["type": "string", "enum": ["topics", "participants", "communication", "all"], "default": "all"],
-                        "min_occurrences": ["type": "integer", "default": 3, "minimum": 2]
+                        "time_range": ["type": "string", "enum": ["day", "week", "month", "all"], "default": "week", "description": "Analysis period"],
+                        "pattern_type": ["type": "string", "enum": ["topics", "participants", "communication", "all"], "default": "all", "description": "What patterns to analyze"],
+                        "min_occurrences": ["type": "integer", "default": 3, "minimum": 2, "description": "Minimum frequency to be significant"]
                     ]
                 ]
             ],
             [
                 "name": "suggest_related",
-                "description": "Find conversations and messages related to your current search or specific messages. Uses semantic similarity to suggest content you might be interested in based on what you're currently looking at. Use after finding something interesting to discover related discussions, follow-up conversations, or similar topics. Perfect for questions like 'What else was discussed about this topic?' or 'Were there any follow-ups to this decision?'. CHAINING TIP: Use after any search tool to explore related content or find conversation threads that continue the topic.",
+                "description": "BEST FOR: Expanding search results by finding semantically similar content. Discovers follow-ups, related discussions, or parallel conversations. USE WHEN: After finding interesting messages, want to explore 'what else?', or discover if topic was discussed elsewhere. RETURNS: {suggestions[], referenceMessages[], queryContext, suggestionsCount}. TIP: Chain after any search to go deeper.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "reference_messages": ["type": "array", "items": ["type": "string"], "description": "Reference messages to find related content"],
-                        "query_context": ["type": "string", "description": "Query context to base suggestions on"],
-                        "suggestion_type": ["type": "string", "enum": ["similar", "followup", "related", "all"], "default": "all"],
-                        "limit": ["type": "integer", "default": 5, "minimum": 1, "maximum": 20]
+                        "reference_messages": ["type": "array", "items": ["type": "string"], "description": "Message IDs to find similar content for. Example: ['1750947252.454503']"],
+                        "query_context": ["type": "string", "description": "Topic description if no message IDs. Example: 'kubernetes migration discussions'"],
+                        "suggestion_type": ["type": "string", "enum": ["similar", "followup", "related", "all"], "default": "all", "description": "Type of relationships to find"],
+                        "limit": ["type": "integer", "default": 10, "minimum": 1, "maximum": 20]
                     ]
                 ]
             ],
             [
                 "name": "conversational_search",
-                "description": "Conduct an ongoing search conversation where each query builds on previous ones. Maintains session context across multiple searches, allowing you to refine, narrow, or expand your search iteratively. Use for exploratory search sessions where you want to progressively drill down or explore a topic. Example workflow: 1) Start with 'mobile app bugs' 2) Refine to 'iOS crashes' 3) Further refine to 'crashes in authentication module'. CHAINING TIP: Perfect for follow-up questions like 'show me more recent ones' or 'now filter by user John'.",
+                "description": "BEST FOR: Multi-turn search sessions where each query refines the previous. Maintains context between searches for natural follow-ups. USE WHEN: Exploring a topic iteratively, need to remember previous searches, or progressively narrowing results. RETURNS: {sessionId, results[], enhancedQuery, refinementSuggestions[], sessionContext}. TIP: Say 'show more', 'filter by John', 'from last week' naturally.",
                 "inputSchema": [
                     "type": "object",
                     "properties": [
-                        "query": ["type": "string", "description": "Natural language search query"],
-                        "session_id": ["type": "string", "description": "Conversation session ID (optional, will create new if not provided)"],
-                        "action": ["type": "string", "enum": ["search", "refine", "start_session", "end_session"], "default": "search"],
+                        "query": ["type": "string", "description": "Search query or refinement. Examples: 'API errors', 'show more recent ones', 'only from Alice'"],
+                        "session_id": ["type": "string", "description": "Continue previous session (auto-created if omitted)"],
+                        "action": ["type": "string", "enum": ["search", "refine", "start_session", "end_session"], "default": "search", "description": "search=new/continue, refine=modify last"],
                         "refinement": [
                             "type": "object",
+                            "description": "For action=refine only",
                             "properties": [
                                 "type": ["type": "string", "enum": ["add_keywords", "remove_keywords", "add_channels", "add_users", "change_time"]],
                                 "keywords": ["type": "array", "items": ["type": "string"]],
@@ -464,35 +474,27 @@ class MCPServer {
         // Tool Chaining Examples for Complex Workflows
         let toolChainExamples = """
         
-        TOOL CHAINING WORKFLOWS:
+        📋 EXAMPLE WORKFLOWS:
         
-        COMPLEX ANALYSIS WORKFLOW:
-        Query: "Find technical discussions that led to the API redesign decision"
-        1. parse_natural_query → extract intent and keywords
-        2. intelligent_search → find relevant discussions  
-        3. suggest_related → find follow-up conversations
-        4. get_thread_context → get full decision threads
+        "Find how we decided on X":
+        1. intelligent_search → Find decision discussions
+        2. get_thread_context → Read full threads
+        3. suggest_related → Find follow-ups
         
-        EXPLORATORY SEARCH WORKFLOW:
-        Query: "What's been happening with the mobile team?"
-        1. discover_patterns → identify recent topics and active people
-        2. search_messages → filter by identified people/topics
-        3. conversational_search → drill down into specific areas
-        4. suggest_related → find related discussions
+        "What's the team working on?":
+        1. discover_patterns → See trending topics
+        2. search_messages → Deep dive on topics
+        3. conversational_search → Explore iteratively
         
-        TROUBLESHOOTING WORKFLOW:
-        Query: "Help me understand this error message"
-        1. get_message_context → understand the cryptic message
-        2. search_messages → find similar error reports
-        3. get_thread_context → see full conversation around the error
-        4. suggest_related → find solution discussions
+        "Debug this error":
+        1. search_messages → Find error mentions
+        2. get_thread_context → Read solutions
+        3. suggest_related → Find similar issues
         
-        CATCH-UP WORKFLOW:
-        Query: "What did I miss in #engineering this week?"
-        1. search_messages → filter by channel and date range
-        2. discover_patterns → identify main topics discussed
-        3. intelligent_search → find key decisions or conclusions
-        4. suggest_related → find related discussions in other channels
+        "Weekly catch-up":
+        1. search_messages → Channel + date filter
+        2. discover_patterns → Topic summary
+        3. intelligent_search → Key decisions
         """
         
         let response: [String: Any] = [
@@ -745,7 +747,7 @@ class MCPServer {
             if startDate == nil {
                 return JSONRPCResponse(
                     result: nil,
-                    error: JSONRPCError(code: -32602, message: "Invalid 'start_date' format '\(startDateStr)'. Use ISO 8601 format like '2024-03-15' or '2024-03-15T14:30:00Z'. For relative dates, try using 'intelligent_search' which understands 'last week', 'yesterday', etc."),
+                    error: JSONRPCError(code: -32602, message: "Invalid 'start_date' format '\(startDateStr)'. Use ISO 8601 format with time like '2024-03-15T00:00:00Z' or '2024-03-15T14:30:00Z'."),
                     id: id
                 )
             }
@@ -756,7 +758,7 @@ class MCPServer {
             if endDate == nil {
                 return JSONRPCResponse(
                     result: nil,
-                    error: JSONRPCError(code: -32602, message: "Invalid 'end_date' format '\(endDateStr)'. Use ISO 8601 format like '2024-03-20' or '2024-03-20T18:00:00Z'. For relative dates, try using 'intelligent_search' which understands 'now', 'today', etc."),
+                    error: JSONRPCError(code: -32602, message: "Invalid 'end_date' format '\(endDateStr)'. Use ISO 8601 format with time like '2024-03-20T23:59:59Z' or '2024-03-20T18:00:00Z'."),
                     id: id
                 )
             }
@@ -812,23 +814,52 @@ class MCPServer {
             filters.append(await queryService.filterByTimeRange(from: start, to: end))
         }
         
-        // For now, return a placeholder response that shows we received the parameters
-        // TODO: Implement actual search with database integration
-        let result = [
-            "query": query,
-            "searchMode": searchModeStr,
-            "filters": [
-                "channels": channels,
-                "users": users,
-                "startDate": startDate?.timeIntervalSince1970 as Any,
-                "endDate": endDate?.timeIntervalSince1970 as Any
-            ],
-            "limit": limit,
-            "status": "Phase 2 search infrastructure ready",
-            "message": "Search functionality implemented but requires database integration"
-        ] as [String: Any]
+        // Get database from ProductionService
+        guard let database = await ProductionService.shared.getDatabase() else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Database not initialized. The service is still starting up. Please wait a moment and try again."),
+                id: id
+            )
+        }
         
-        return JSONRPCResponse(result: result, error: nil, id: id)
+        // Perform database search
+        do {
+            let results = try await database.searchMessages(
+                query: query,
+                channels: channels.isEmpty ? nil : channels,
+                users: users.isEmpty ? nil : users,
+                startDate: startDate,
+                endDate: endDate,
+                limit: limit
+            )
+            
+            // Format results
+            let formattedResults = results.map { result in
+                [
+                    "id": result.message.id,
+                    "workspace": result.workspace,
+                    "channel": result.message.channel,
+                    "sender": result.message.sender,
+                    "content": result.message.content,
+                    "timestamp": ISO8601DateFormatter().string(from: result.message.timestamp),
+                    "threadId": result.message.threadId as Any
+                ] as [String: Any]
+            }
+            
+            // Provide helpful guidance for empty results
+            let result: Any = formattedResults.isEmpty ?
+                createEmptyResultsGuidance(query: query, toolName: "search_messages") :
+                formattedResults
+            
+            return JSONRPCResponse(result: result, error: nil, id: id)
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Search failed: \(error.localizedDescription). Try simplifying your query or check if the database is accessible."),
+                id: id
+            )
+        }
     }
     
     internal func handleGetThreadContext(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
@@ -842,26 +873,138 @@ class MCPServer {
         
         let includeContext = arguments["include_context"] as? Bool ?? true
         
-        // For now, return a placeholder response
-        // TODO: Implement actual thread context extraction
-        let result = [
-            "threadId": threadId,
-            "includeContext": includeContext,
-            "status": "Thread context extraction ready",
-            "message": "Thread context functionality implemented but requires database integration",
-            "placeholder": [
-                "threadId": threadId,
-                "messages": [],
-                "contextualMeanings": [],
-                "participants": [],
-                "timespan": [
-                    "start": NSNull() as Any,
-                    "end": NSNull() as Any
-                ]
-            ]
-        ] as [String: Any]
+        guard let database = self.database else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Database not initialized"),
+                id: id
+            )
+        }
         
-        return JSONRPCResponse(result: result, error: nil, id: id)
+        do {
+            // Fetch all messages in the thread
+            let threadMessages = try await database.getThreadMessages(threadId: threadId, limit: 1000)
+            
+            guard !threadMessages.isEmpty else {
+                return JSONRPCResponse(
+                    result: nil,
+                    error: JSONRPCError(code: -32602, message: "Thread not found with id: \(threadId)"),
+                    id: id
+                )
+            }
+            
+            // Sort messages by timestamp
+            let sortedMessages = threadMessages.sorted { $0.message.timestamp < $1.message.timestamp }
+            
+            // Extract participants
+            let participants = Set(sortedMessages.map { $0.message.sender })
+            
+            // Get time span
+            let startTime = sortedMessages.first?.message.timestamp ?? Date()
+            let endTime = sortedMessages.last?.message.timestamp ?? Date()
+            
+            // Convert messages to dictionary format
+            var messageData: [[String: Any]] = []
+            var contextualMeanings: [[String: Any]] = []
+            
+            if includeContext {
+                // Initialize message contextualizer if needed
+                guard let messageContextualizer = self.messageContextualizer else {
+                    return JSONRPCResponse(
+                        result: nil,
+                        error: JSONRPCError(code: -32603, message: "Message contextualizer not initialized"),
+                        id: id
+                    )
+                }
+                
+                // Set database on contextualizer
+                await messageContextualizer.setDatabase(database)
+                
+                // Create thread context for contextual analysis
+                let threadContext = ThreadContext(
+                    threadId: threadId,
+                    parentMessage: sortedMessages.first?.message,
+                    recentMessages: sortedMessages.map { $0.message },
+                    totalMessageCount: sortedMessages.count
+                )
+                
+                // Process each message
+                for (index, messageWithWorkspace) in sortedMessages.enumerated() {
+                    let message = messageWithWorkspace.message
+                    
+                    // Basic message data
+                    messageData.append([
+                        "id": message.id,
+                        "content": message.content,
+                        "sender": message.sender,
+                        "timestamp": ISO8601DateFormatter().string(from: message.timestamp),
+                        "workspace": messageWithWorkspace.workspace,
+                        "channel": message.channel,
+                        "isParent": index == 0,
+                        "position": index
+                    ])
+                    
+                    // Extract contextual meaning for short messages
+                    if let contextualMeaning = await messageContextualizer.extractContextualMeaning(
+                        from: message,
+                        threadContext: threadContext
+                    ) {
+                        contextualMeanings.append([
+                            "messageId": message.id,
+                            "originalContent": message.content,
+                            "contextualMeaning": contextualMeaning,
+                            "position": index
+                        ])
+                    }
+                }
+            } else {
+                // Without context, just return basic message data
+                for (index, messageWithWorkspace) in sortedMessages.enumerated() {
+                    let message = messageWithWorkspace.message
+                    messageData.append([
+                        "id": message.id,
+                        "content": message.content,
+                        "sender": message.sender,
+                        "timestamp": ISO8601DateFormatter().string(from: message.timestamp),
+                        "workspace": messageWithWorkspace.workspace,
+                        "channel": message.channel,
+                        "isParent": index == 0,
+                        "position": index
+                    ])
+                }
+            }
+            
+            // Build result
+            let result: [String: Any] = [
+                "threadId": threadId,
+                "parentMessage": sortedMessages.first != nil ? [
+                    "id": sortedMessages.first!.message.id,
+                    "content": sortedMessages.first!.message.content,
+                    "sender": sortedMessages.first!.message.sender,
+                    "timestamp": ISO8601DateFormatter().string(from: sortedMessages.first!.message.timestamp)
+                ] : NSNull(),
+                "messages": messageData,
+                "contextualMeanings": contextualMeanings,
+                "participants": Array(participants),
+                "messageCount": sortedMessages.count,
+                "timespan": [
+                    "start": ISO8601DateFormatter().string(from: startTime),
+                    "end": ISO8601DateFormatter().string(from: endTime),
+                    "durationMinutes": Int(endTime.timeIntervalSince(startTime) / 60)
+                ],
+                "workspace": sortedMessages.first?.workspace ?? "",
+                "channel": sortedMessages.first?.message.channel ?? ""
+            ]
+            
+            return JSONRPCResponse(result: result, error: nil, id: id)
+            
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Failed to extract thread context: \(error.localizedDescription)"),
+                id: id
+            )
+        }
     }
     
     internal func handleGetMessageContext(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
@@ -875,31 +1018,119 @@ class MCPServer {
         
         let includeThread = arguments["include_thread"] as? Bool ?? true
         
-        // For now, return a placeholder response
-        // TODO: Implement actual message context extraction using MessageContextualizer
-        let result = [
-            "messageId": messageId,
-            "includeThread": includeThread,
-            "status": "Message context extraction ready",
-            "message": "Message context functionality implemented but requires database integration",
-            "placeholder": [
+        guard let database = self.database else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Database not initialized"),
+                id: id
+            )
+        }
+        
+        do {
+            // Fetch the message from database
+            guard let messageWithWorkspace = try await database.getMessageById(messageId: messageId) else {
+                return JSONRPCResponse(
+                    result: nil,
+                    error: JSONRPCError(code: -32602, message: "Message not found with id: \(messageId)"),
+                    id: id
+                )
+            }
+            
+            let message = messageWithWorkspace.message
+            
+            // Check if messageContextualizer is available
+            guard let messageContextualizer = self.messageContextualizer else {
+                return JSONRPCResponse(
+                    result: nil,
+                    error: JSONRPCError(code: -32603, message: "Message contextualizer not initialized"),
+                    id: id
+                )
+            }
+            
+            // Set database on contextualizer
+            await messageContextualizer.setDatabase(database)
+            
+            // Get thread context if requested and message is in a thread
+            var threadContext: ThreadContext?
+            var threadMessages: [[String: Any]] = []
+            
+            if includeThread, let threadId = message.threadId {
+                let threadMessagesData = try await database.getThreadMessages(threadId: threadId)
+                let messages = threadMessagesData.map { $0.message }
+                
+                threadContext = ThreadContext(
+                    threadId: threadId,
+                    parentMessage: messages.first,
+                    recentMessages: Array(messages.suffix(5)),
+                    totalMessageCount: messages.count
+                )
+                
+                // Convert thread messages to dictionary format
+                threadMessages = messages.map { msg in
+                    [
+                        "id": msg.id,
+                        "content": msg.content,
+                        "sender": msg.sender,
+                        "timestamp": ISO8601DateFormatter().string(from: msg.timestamp),
+                        "isParent": msg.id == threadId
+                    ]
+                }
+            }
+            
+            // Extract contextual meaning
+            let contextualMeaning = await messageContextualizer.extractContextualMeaning(
+                from: message,
+                threadContext: threadContext
+            )
+            
+            // Check if it's a short message
+            let isShortMessage = message.content.count < 10 || 
+                                message.content.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.allSatisfy({ $0.properties.isEmojiPresentation })
+            
+            // Get enhanced content
+            let enhancedContent = isShortMessage ? 
+                await messageContextualizer.enhanceWithThreadContext(message: message) :
+                message.content
+            
+            let channelContext = await messageContextualizer.enhanceWithChannelContext(message: message)
+            
+            let result: [String: Any] = [
                 "originalMessage": [
-                    "id": messageId,
-                    "content": "",
-                    "sender": "",
-                    "timestamp": NSNull() as Any
+                    "id": message.id,
+                    "content": message.content,
+                    "sender": message.sender,
+                    "timestamp": ISO8601DateFormatter().string(from: message.timestamp),
+                    "channel": message.channel,
+                    "workspace": messageWithWorkspace.workspace,
+                    "threadId": message.threadId ?? NSNull() as Any
                 ],
-                "contextualMeaning": "",
-                "threadContext": includeThread ? [:] as [String: Any] : NSNull() as Any,
+                "contextualMeaning": contextualMeaning ?? "No additional context extracted",
+                "threadContext": includeThread && threadContext != nil ? [
+                    "threadId": threadContext!.threadId,
+                    "parentMessage": threadContext!.parentMessage != nil ? [
+                        "id": threadContext!.parentMessage!.id,
+                        "content": threadContext!.parentMessage!.content,
+                        "sender": threadContext!.parentMessage!.sender
+                    ] : NSNull(),
+                    "messages": threadMessages,
+                    "totalCount": threadContext!.totalMessageCount
+                ] as [String: Any] : NSNull(),
                 "enhancement": [
-                    "wasShortMessage": false,
-                    "contextAdded": false,
-                    "embeddingEnhanced": false
+                    "wasShortMessage": isShortMessage,
+                    "enhancedContent": enhancedContent,
+                    "channelContext": channelContext
                 ]
             ]
-        ] as [String: Any]
-        
-        return JSONRPCResponse(result: result, error: nil, id: id)
+            
+            return JSONRPCResponse(result: result, error: nil, id: id)
+            
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Failed to extract message context: \(error.localizedDescription)"),
+                id: id
+            )
+        }
     }
     
     // MARK: - Phase 3 MCP Tool Handlers
@@ -1029,8 +1260,8 @@ class MCPServer {
             await queryService.setDatabase(database)
             
             // Get conversation summaries for pattern analysis (simplified approach)
-            let totalMessages = try await queryService.getMessageCount()
-            let workspaceCount = try await queryService.getWorkspaceCount()
+            let _ = try await queryService.getMessageCount()
+            let _ = try await queryService.getWorkspaceCount()
             
             // For now, return basic patterns until we implement getAllSummaries in SlackQueryService
             let summaries: [TextSummary] = [] // Fixed type to match function expectations

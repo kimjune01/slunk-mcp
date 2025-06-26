@@ -13,7 +13,21 @@ struct slunk_swiftApp: App {
         if isMCPMode {
             // Run as MCP server only
             let mcpServer = MCPServer()
-            mcpServer.start()
+            
+            // Initialize database before starting server
+            Task {
+                do {
+                    // Initialize the production service to set up database
+                    let productionService = await ProductionService.shared
+                    try await productionService.initialize()
+                    
+                    // Start MCP server after database is ready
+                    mcpServer.start()
+                } catch {
+                    print("Failed to initialize database: \(error)")
+                    exit(1)
+                }
+            }
             
             // Keep the app running
             RunLoop.main.run()

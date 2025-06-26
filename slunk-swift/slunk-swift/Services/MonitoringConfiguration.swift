@@ -20,9 +20,9 @@ public struct MonitoringConfiguration {
     public let maxExtractionHistory: Int
     
     public static let `default` = MonitoringConfiguration(
-        pollIntervalActive: 1.0,
-        pollIntervalBackground: 5.0,
-        pollIntervalInactive: 10.0,
+        pollIntervalActive: 5.0,
+        pollIntervalBackground: 10.0,
+        pollIntervalInactive: 30.0,
         retryDelay: 5.0,
         maxRetries: 3,
         contentParsingEnabled: false,

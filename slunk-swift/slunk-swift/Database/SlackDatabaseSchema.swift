@@ -220,16 +220,46 @@ public class SlackDatabaseSchema {
             throw SlackDatabaseError.databaseNotOpen
         }
         
-        let messageId = message.deduplicationKey
+        let messageId = message.id  // Use the actual message ID (timestamp-based)
         let contentHash = message.contentHash
         
-        // Check if message exists
-        let existingSQL = "SELECT * FROM slack_messages WHERE id = ? AND workspace = ? AND channel = ?"
-        let existing = try await database.read { db in
-            return try Row.fetchAll(db, sql: existingSQL, arguments: [messageId, workspace, channel])
+        // Check if an identical message already exists using the deduplication key
+        let duplicateCheckSQL = """
+            SELECT id, content_hash, content, sender 
+            FROM slack_messages 
+            WHERE workspace = ? AND channel = ? AND sender = ? AND content = ?
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """
+        
+        let duplicates = try await database.read { db in
+            return try Row.fetchAll(db, sql: duplicateCheckSQL, arguments: [
+                workspace, channel, message.sender, message.content
+            ])
         }
         
-        if let existingRow = existing.first {
+        if let existingRow = duplicates.first {
+            let existingId: String = existingRow["id"]
+            
+            // It's a duplicate - same content, channel, and sender
+            // Check if reactions need updating
+            if let existingReactions = try await getMessageReactions(messageId: existingId),
+               let newReactions = message.metadata?.reactions,
+               !reactionsEqual(existingReactions, newReactions) {
+                try await updateReactions(messageId: existingId, reactions: newReactions)
+                return .reactionsUpdated(existingId)
+            }
+            
+            return .duplicate
+        }
+        
+        // Check if this specific message ID already exists (for updates)
+        let existingByIdSQL = "SELECT * FROM slack_messages WHERE id = ? AND workspace = ? AND channel = ?"
+        let existingById = try await database.read { db in
+            return try Row.fetchAll(db, sql: existingByIdSQL, arguments: [messageId, workspace, channel])
+        }
+        
+        if let existingRow = existingById.first {
             let existingHash: String = existingRow["content_hash"] ?? ""
             let existingContent: String = existingRow["content"] ?? ""
             
@@ -237,14 +267,6 @@ public class SlackDatabaseSchema {
             if existingHash != contentHash || existingContent != message.content {
                 try await updateMessage(message, messageId: messageId, workspace: workspace, channel: channel)
                 return .updated(messageId)
-            }
-            
-            // Check if reactions changed
-            if let existingReactions = try await getMessageReactions(messageId: messageId),
-               let newReactions = message.metadata?.reactions,
-               !reactionsEqual(existingReactions, newReactions) {
-                try await updateReactions(messageId: messageId, reactions: newReactions)
-                return .reactionsUpdated(messageId)
             }
             
             return .duplicate
@@ -450,6 +472,167 @@ public class SlackDatabaseSchema {
         
         return try await db.read { db in
             try Int64.fetchOne(db, sql: "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()") ?? 0
+        }
+    }
+    
+    // MARK: - Search Methods
+    
+    public struct SlackMessageWithWorkspace {
+        public let message: SlackMessage
+        public let workspace: String
+    }
+    
+    public func getMessageById(messageId: String) async throws -> SlackMessageWithWorkspace? {
+        guard let db = database else {
+            throw SlackDatabaseError.databaseNotOpen
+        }
+        
+        return try await db.read { db in
+            let sql = """
+                SELECT id, workspace, timestamp, sender, content, channel, thread_ts,
+                       mentions, attachment_names, version, edited_at
+                FROM slack_messages
+                WHERE id = ?
+                LIMIT 1
+            """
+            
+            if let row = try Row.fetchOne(db, sql: sql, arguments: [messageId]) {
+                // Deserialize JSON fields
+                let mentionsJSON: String = row["mentions"] ?? "[]"
+                let attachmentsJSON: String = row["attachment_names"] ?? "[]"
+                let mentions = try? self.deserializeStringArray(mentionsJSON)
+                let attachments = try? self.deserializeStringArray(attachmentsJSON)
+                
+                // Create metadata if we have any
+                let metadata: SlackMessage.MessageMetadata? = (mentions != nil || attachments != nil || row["version"] != nil || row["edited_at"] != nil) ? SlackMessage.MessageMetadata(
+                    editedAt: row["edited_at"],
+                    reactions: nil,  // Would need to fetch separately
+                    mentions: mentions ?? [],
+                    attachmentNames: attachments ?? [],
+                    version: row["version"] ?? 1
+                ) : nil
+                
+                return SlackMessageWithWorkspace(
+                    message: SlackMessage(
+                        id: row["id"],
+                        timestamp: row["timestamp"],
+                        sender: row["sender"],
+                        content: row["content"],
+                        channel: row["channel"],
+                        threadId: row["thread_ts"],
+                        messageType: .regular,
+                        metadata: metadata
+                    ),
+                    workspace: row["workspace"]
+                )
+            }
+            return nil
+        }
+    }
+    
+    public func getThreadMessages(threadId: String, limit: Int = 100) async throws -> [SlackMessageWithWorkspace] {
+        guard let db = database else {
+            throw SlackDatabaseError.databaseNotOpen
+        }
+        
+        return try await db.read { db in
+            let sql = """
+                SELECT id, workspace, timestamp, sender, content, channel, thread_ts
+                FROM slack_messages
+                WHERE thread_ts = ?
+                ORDER BY timestamp ASC
+                LIMIT ?
+            """
+            
+            let rows = try Row.fetchAll(db, sql: sql, arguments: [threadId, limit])
+            
+            return rows.map { row in
+                SlackMessageWithWorkspace(
+                    message: SlackMessage(
+                        id: row["id"],
+                        timestamp: row["timestamp"],
+                        sender: row["sender"],
+                        content: row["content"],
+                        channel: row["channel"],
+                        threadId: row["thread_ts"],
+                        messageType: .regular,
+                        metadata: nil
+                    ),
+                    workspace: row["workspace"]
+                )
+            }
+        }
+    }
+    
+    public func searchMessages(
+        query: String,
+        channels: [String]? = nil,
+        users: [String]? = nil,
+        startDate: Date? = nil,
+        endDate: Date? = nil,
+        limit: Int = 20
+    ) async throws -> [SlackMessageWithWorkspace] {
+        guard let db = database else {
+            throw SlackDatabaseError.databaseNotOpen
+        }
+        
+        return try await db.read { db in
+            var sql = "SELECT id, workspace, timestamp, sender, content, channel, thread_ts FROM slack_messages WHERE 1=1"
+            var arguments: [DatabaseValueConvertible] = []
+            
+            // Add query filter (search in content)
+            if !query.isEmpty {
+                sql += " AND content LIKE ?"
+                arguments.append("%\(query)%")
+            }
+            
+            // Add channel filter
+            if let channels = channels, !channels.isEmpty {
+                let placeholders = Array(repeating: "?", count: channels.count).joined(separator: ",")
+                sql += " AND channel IN (\(placeholders))"
+                arguments.append(contentsOf: channels)
+            }
+            
+            // Add user filter
+            if let users = users, !users.isEmpty {
+                let placeholders = Array(repeating: "?", count: users.count).joined(separator: ",")
+                sql += " AND sender IN (\(placeholders))"
+                arguments.append(contentsOf: users)
+            }
+            
+            // Add date range filter
+            if let startDate = startDate {
+                sql += " AND timestamp >= ?"
+                arguments.append(startDate)
+            }
+            
+            if let endDate = endDate {
+                sql += " AND timestamp <= ?"
+                arguments.append(endDate)
+            }
+            
+            // Order by timestamp descending and apply limit
+            sql += " ORDER BY timestamp DESC LIMIT ?"
+            arguments.append(limit)
+            
+            let rows = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(arguments))
+            
+            // Return SlackMessageWithWorkspace objects
+            return rows.map { row in
+                SlackMessageWithWorkspace(
+                    message: SlackMessage(
+                        id: row["id"],
+                        timestamp: row["timestamp"],
+                        sender: row["sender"],
+                        content: row["content"],
+                        channel: row["channel"],
+                        threadId: row["thread_ts"],
+                        messageType: .regular,
+                        metadata: nil
+                    ),
+                    workspace: row["workspace"]
+                )
+            }
         }
     }
 }

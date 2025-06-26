@@ -28,6 +28,24 @@ struct ContentView: View {
         #endif
     }
     
+    var buildTimestamp: String {
+        // Get the modification date of the main executable
+        if let executableURL = Bundle.main.executableURL {
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: executableURL.path)
+                if let modificationDate = attributes[.modificationDate] as? Date {
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                    formatter.timeZone = TimeZone.current
+                    return formatter.string(from: modificationDate)
+                }
+            } catch {
+                debugPrint("Failed to get build timestamp: \(error)")
+            }
+        }
+        return "Unknown"
+    }
+    
     var body: some View {
         VStack(spacing: 10) {
             // Header with title and exit button
@@ -37,18 +55,25 @@ struct ContentView: View {
                         .font(.title2)
                         .fontWeight(.medium)
                     
-                    // Build configuration indicator
-                    Text(buildConfiguration)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(buildConfigurationColor.opacity(0.2))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .strokeBorder(buildConfigurationColor.opacity(0.5), lineWidth: 1)
-                        )
-                        .cornerRadius(4)
+                    HStack(spacing: 6) {
+                        // Build configuration indicator
+                        Text(buildConfiguration)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(buildConfigurationColor.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .strokeBorder(buildConfigurationColor.opacity(0.5), lineWidth: 1)
+                            )
+                            .cornerRadius(4)
+                        
+                        // Build timestamp
+                        Text("Built: \(buildTimestamp)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
                 HStack(spacing: 4) {
@@ -190,7 +215,7 @@ struct ContentView: View {
             
         }
         .padding(12)
-        .frame(width: 400, height: 290)
+        .frame(width: 400, height: 300)
         .onAppear {
             refreshDatabaseStats()
             // Note: Slack monitoring is started automatically by AppDelegate

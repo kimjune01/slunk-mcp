@@ -225,12 +225,16 @@ extension SlackMessage: Validatable {
 
 extension SlackMessage: Deduplicatable {
     public var deduplicationKey: String {
-        // Use timestamp as primary key (Slack's message ID format)
-        return "\(timestamp.timeIntervalSince1970)"
+        // Use channel, sender, and content hash for better deduplication
+        // This prevents the same message from being stored multiple times
+        let contentOnly = "\(channel):\(sender):\(content)"
+        return contentOnly.sha256Hash
     }
     
     public var contentHash: String {
-        let hashContent = "\(content)\(sender)\(timestamp.timeIntervalSince1970)"
+        // Hash based on content and sender only (no timestamp)
+        // This allows us to identify identical messages regardless of capture time
+        let hashContent = "\(content)\(sender)"
         return hashContent.sha256Hash
     }
     
@@ -278,7 +282,8 @@ extension SlackMessage: Deduplicatable {
     }
     
     public static func generateContentHash(content: String, sender: String, timestamp: Date) -> String {
-        let hashContent = "\(content)\(sender)\(timestamp.timeIntervalSince1970)"
+        // Updated to match the instance contentHash method - no timestamp in hash
+        let hashContent = "\(content)\(sender)"
         return hashContent.sha256Hash
     }
 }

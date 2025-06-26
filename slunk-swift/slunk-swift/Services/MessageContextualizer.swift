@@ -425,10 +425,25 @@ public actor MessageContextualizer {
     
     // MARK: - Helper Methods
     
+    private var database: SlackDatabaseSchema?
+    
+    public func setDatabase(_ database: SlackDatabaseSchema) {
+        self.database = database
+    }
+    
     private func getThreadMessages(threadId: String) async -> [SlackMessage] {
-        // This would require database access - returning empty for now
-        // In real implementation, this would query the database for thread messages
-        return []
+        guard let database = database else {
+            return []
+        }
+        
+        do {
+            let messages = try await database.getThreadMessages(threadId: threadId)
+            return messages.map { $0.message }
+        } catch {
+            // Log error and return empty array
+            print("Error fetching thread messages: \(error)")
+            return []
+        }
     }
 }
 
