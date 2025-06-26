@@ -1,12 +1,12 @@
 # Slunk - Real-time Slack Search & Analytics for macOS
 
-Slunk is a Swift-based macOS application that provides intelligent Slack search and analytics through an MCP (Model Context Protocol) server. It monitors Slack in real-time, stores messages locally with automatic deduplication, and offers advanced search capabilities through 9 comprehensive MCP tools.
+Slunk is a Swift-based macOS application that provides intelligent Slack search and analytics through an MCP (Model Context Protocol) server. It monitors Slack in real-time, stores messages locally with automatic deduplication, and offers advanced search capabilities through 8 comprehensive MCP tools.
 
 ## Key Features
 
 - **🔍 Real-time Slack Monitoring** - Automatic message capture and database storage
 - **💾 Local SQLite Database** - Messages stored with deduplication and 2-month retention
-- **🤖 9 MCP Search Tools** - Natural language search, filtering, pattern discovery
+- **🤖 8 MCP Search Tools** - Natural language search, filtering, pattern discovery
 - **🧠 Semantic Search** - 512-dimensional vector embeddings for meaning-based search
 - **📊 Conversation Analytics** - Pattern discovery and trend analysis
 - **🔒 Privacy-First** - All data stored locally on your machine
@@ -34,7 +34,7 @@ slunk/
 - Real-time Slack monitoring with accessibility API
 - SQLite database with vector search (SQLiteVec)
 - Message deduplication and automatic cleanup (2-month retention)
-- 9 comprehensive MCP tools for search and analysis
+- 8 comprehensive MCP tools for search and analysis
 - SwiftUI interface with database statistics
 
 ## Quick Start
@@ -90,7 +90,6 @@ The 9 MCP tools provide comprehensive Slack search capabilities:
 
 ### Intelligent Query Processing
 - **`parse_natural_query`** - Extract intent and entities from natural language
-- **`intelligent_search`** - Advanced search combining NLP and context
 - **`conversational_search`** - Multi-turn search sessions with refinement
 
 ### Analytics & Discovery

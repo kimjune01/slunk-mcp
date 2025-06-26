@@ -96,7 +96,7 @@ slack_message_embeddings (
 - Prevents storing duplicate messages captured during polling intervals
 - Maintains message edit history through version tracking
 
-## MCP Tools (9 Total)
+## MCP Tools (8 Total)
 
 ### Basic Search
 - `searchConversations` - Quick natural language searches across all messages
@@ -113,8 +113,6 @@ slack_message_embeddings (
 ### Intelligence Layer
 - `parse_natural_query` - Extract intent, entities, and dates from queries
   - Returns: `{intent, keywords[], channels[], users[], entities[], temporalHint}`
-- `intelligent_search` - Complex analytical queries with deep understanding
-  - Returns: `{query, parsedIntent, results[], extractedKeywords[], extractedEntities[]}`
 - `conversational_search` - Multi-turn search sessions with context
   - Returns: `{sessionId, results[], enhancedQuery, refinementSuggestions[], sessionContext}`
 

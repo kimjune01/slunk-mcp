@@ -72,22 +72,22 @@ public final class DatabaseCleanupService: ObservableObject {
     /// Set the database instance to clean up
     func setDatabase(_ database: SlackDatabaseSchema) {
         self.database = database
-        debugPrint("📁 Database cleanup service configured with database")
+        Logger.shared.logDatabaseCleanup("📁 Database cleanup service configured with database")
     }
     
     /// Start the periodic cleanup timer
     public func startPeriodicCleanup() {
         guard cleanupEnabled else {
-            debugPrint("⏸️ Database cleanup disabled - timer not started")
+            Logger.shared.logDatabaseCleanup("⏸️ Database cleanup disabled - timer not started")
             return
         }
         
         guard cleanupTimer == nil else {
-            debugPrint("⚠️ Cleanup timer already running")
+            Logger.shared.logDatabaseCleanup("⚠️ Cleanup timer already running", type: .info)
             return
         }
         
-        debugPrint("⏰ Starting database cleanup timer (checking every hour)")
+        Logger.shared.logDatabaseCleanup("⏰ Starting database cleanup timer (checking every hour)")
         
         // Start timer for hourly checks
         cleanupTimer = Timer.scheduledTimer(withTimeInterval: Self.cleanupInterval, repeats: true) { [weak self] _ in
@@ -107,12 +107,12 @@ public final class DatabaseCleanupService: ObservableObject {
     public func stopPeriodicCleanup() {
         cleanupTimer?.invalidate()
         cleanupTimer = nil
-        debugPrint("⏹️ Database cleanup timer stopped")
+        Logger.shared.logDatabaseCleanup("⏹️ Database cleanup timer stopped")
     }
     
     /// Manually trigger cleanup operation
     public func performManualCleanup() async -> CleanupStats {
-        debugPrint("🗑️ Manual database cleanup requested")
+        Logger.shared.logDatabaseCleanup("🗑️ Manual database cleanup requested")
         return await performCleanup(isManual: true)
     }
     
@@ -164,17 +164,17 @@ public final class DatabaseCleanupService: ObservableObject {
             return
         }
         
-        debugPrint("⏰ Scheduled database cleanup starting")
+        Logger.shared.logDatabaseCleanup("⏰ Scheduled database cleanup starting")
         let stats = await performCleanup(isManual: false)
         
         if stats.messagesDeleted > 0 {
-            debugPrint("✅ Scheduled cleanup completed - deleted \(stats.messagesDeleted) old messages")
+            Logger.shared.logDatabaseCleanup("✅ Scheduled cleanup completed - deleted \(stats.messagesDeleted) old messages")
         }
     }
     
     private func performCleanup(isManual: Bool) async -> CleanupStats {
         guard let database = database else {
-            debugPrint("⚠️ Cannot perform cleanup - no database configured")
+            Logger.shared.logDatabaseCleanup("⚠️ Cannot perform cleanup - no database configured", type: .error)
             return CleanupStats(
                 startDate: Date(),
                 endDate: Date(),
@@ -191,10 +191,10 @@ public final class DatabaseCleanupService: ObservableObject {
         let startDate = Date()
         let cutoffDate = getRetentionCutoffDate()
         
-        debugPrint("🗑️ Starting database cleanup:")
-        debugPrint("   Cutoff date: \(cutoffDate)")
-        debugPrint("   Retention period: \(getRetentionDescription())")
-        debugPrint("   Manual: \(isManual)")
+        Logger.shared.logDatabaseCleanup("🗑️ Starting database cleanup:")
+        Logger.shared.logDatabaseCleanup("   Cutoff date: \(cutoffDate)")
+        Logger.shared.logDatabaseCleanup("   Retention period: \(getRetentionDescription())")
+        Logger.shared.logDatabaseCleanup("   Manual: \(isManual)")
         
         var stats = CleanupStats(
             startDate: startDate,
@@ -234,18 +234,18 @@ public final class DatabaseCleanupService: ObservableObject {
             cleanupStats = stats
             saveState()
             
-            debugPrint("✅ Database cleanup completed:")
-            debugPrint("   Messages deleted: \(deletedMessages)")
-            debugPrint("   Reactions deleted: \(deletedReactions)")
-            debugPrint("   Embeddings deleted: \(deletedEmbeddings)")
-            debugPrint("   Space saved: \(formatBytes(spaceSaved))")
-            debugPrint("   Duration: \(String(format: "%.2f", stats.duration))s")
+            Logger.shared.logDatabaseCleanup("✅ Database cleanup completed:")
+            Logger.shared.logDatabaseCleanup("   Messages deleted: \(deletedMessages)")
+            Logger.shared.logDatabaseCleanup("   Reactions deleted: \(deletedReactions)")
+            Logger.shared.logDatabaseCleanup("   Embeddings deleted: \(deletedEmbeddings)")
+            Logger.shared.logDatabaseCleanup("   Space saved: \(formatBytes(spaceSaved))")
+            Logger.shared.logDatabaseCleanup("   Duration: \(String(format: "%.2f", stats.duration))s")
             
         } catch {
             stats.error = error.localizedDescription
             stats.endDate = Date()
             
-            debugPrint("❌ Database cleanup failed: \(error.localizedDescription)")
+            Logger.shared.logDatabaseError(error, context: "DatabaseCleanupService.performCleanup")
         }
         
         return stats
@@ -394,13 +394,13 @@ extension DatabaseCleanupService {
     /// Set retention period in months
     public func setRetentionMonths(_ months: Int) {
         retentionPeriod = TimeInterval(months * 30 * 24 * 60 * 60)
-        debugPrint("📅 Retention period set to \(months) months")
+        Logger.shared.logDatabaseCleanup("📅 Retention period set to \(months) months")
     }
     
     /// Set retention period in days
     public func setRetentionDays(_ days: Int) {
         retentionPeriod = TimeInterval(days * 24 * 60 * 60)
-        debugPrint("📅 Retention period set to \(days) days")
+        Logger.shared.logDatabaseCleanup("📅 Retention period set to \(days) days")
     }
     
     /// Get estimated messages that would be deleted in next cleanup
@@ -417,7 +417,7 @@ extension DatabaseCleanupService {
             }
             return count
         } catch {
-            debugPrint("⚠️ Failed to estimate deletion count: \(error)")
+            Logger.shared.logDatabaseError(error, context: "DatabaseCleanupService.estimateOldMessageCount")
             return 0
         }
     }

@@ -40,185 +40,44 @@ struct ContentView: View {
                     return formatter.string(from: modificationDate)
                 }
             } catch {
-                debugPrint("Failed to get build timestamp: \(error)")
+                ErrorLogger.shared.log(error, context: "ContentView.buildTimestamp")
             }
         }
         return "Unknown"
     }
     
     var body: some View {
-        VStack(spacing: 10) {
-            // Header with title and exit button
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Slunk Monitor")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                    
-                    HStack(spacing: 6) {
-                        // Build configuration indicator
-                        Text(buildConfiguration)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(buildConfigurationColor.opacity(0.2))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .strokeBorder(buildConfigurationColor.opacity(0.5), lineWidth: 1)
-                            )
-                            .cornerRadius(4)
-                        
-                        // Build timestamp
-                        Text("Built: \(buildTimestamp)")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
+        ScrollView {
+            VStack(spacing: 20) {
+                // Header Card
+                HeaderCard(
+                    isRunning: serverManager.isRunning,
+                    buildConfig: buildConfiguration,
+                    buildTimestamp: buildTimestamp,
+                    buildConfigColor: buildConfigurationColor,
+                    onQuit: { showingQuitConfirmation = true }
+                )
+                
+                // MCP Configuration Card
+                if serverManager.isRunning && !serverManager.mcpConfig.isEmpty {
+                    MCPConfigCard(
+                        config: serverManager.mcpConfig,
+                        onCopy: { serverManager.copyMCPConfig() }
+                    )
                 }
                 
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(serverManager.isRunning ? Color.green : Color.red)
-                        .frame(width: 8, height: 8)
-                    Text(serverManager.isRunning ? "Running" : "Stopped")
-                        .font(.caption)
-                        .foregroundColor(serverManager.isRunning ? .green : .red)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    showingQuitConfirmation = true
-                }) {
-                    Text("QUIT")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color.red)
-                        .cornerRadius(4)
-                }
-                .buttonStyle(.plain)
-                .help("Exit application")
+                // Database Stats Card
+                DatabaseStatsCard(
+                    stats: databaseStats,
+                    onRefresh: { refreshDatabaseStats() }
+                )
             }
-            .padding(.bottom, 5)
-            
-            
-            // Only show start button when monitoring is not running
-            if !serverManager.isRunning {
-                Button("Start Monitoring") {
-                    serverManager.start()
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            
-            if serverManager.isRunning && !serverManager.mcpConfig.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("MCP Server Configuration")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Spacer()
-                        Button("Copy Config") {
-                            serverManager.copyMCPConfig()
-                        }
-                        .font(.caption)
-                        .buttonStyle(.bordered)
-                    }
-                    
-                    ScrollView {
-                        Text(serverManager.mcpConfig)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(6)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(4)
-                    }
-                    .frame(height: 80)
-                }
-            }
-            
-            // Database Stats Section
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Database Stats")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Spacer()
-                    Button("Refresh") {
-                        refreshDatabaseStats()
-                    }
-                    .font(.caption)
-                    .buttonStyle(.bordered)
-                }
-                
-                if let stats = databaseStats {
-                    HStack(spacing: 15) {
-                        HStack(spacing: 4) {
-                            Text("Messages:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("\(stats.messageCount)")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                        
-                        Divider()
-                            .frame(height: 12)
-                        
-                        HStack(spacing: 4) {
-                            Text("Workspaces:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("\(stats.workspaceCount)")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                        
-                        Divider()
-                            .frame(height: 12)
-                        
-                        HStack(spacing: 4) {
-                            Text("Size:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(stats.databaseSize)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                        
-                        Spacer()
-                        
-                        Text(formatTimestamp(stats.lastUpdated))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(Color.blue.opacity(0.05))
-                    .cornerRadius(6)
-                } else {
-                    HStack {
-                        Text("Loading stats...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(Color.gray.opacity(0.05))
-                    .cornerRadius(6)
-                }
-            }
-            
+            .padding(20)
         }
-        .padding(12)
-        .frame(width: 400, height: 300)
+        .frame(minWidth: 480, minHeight: 400)
+        .background(Color(NSColor.controlBackgroundColor))
         .onAppear {
             refreshDatabaseStats()
-            // Note: Slack monitoring is started automatically by AppDelegate
         }
         .alert("Quit Application?", isPresented: $showingQuitConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -241,7 +100,7 @@ struct ContentView: View {
                     self.databaseStats = stats
                 }
             } catch {
-                debugPrint("Failed to get database stats: \(error)")
+                ErrorLogger.shared.log(error, context: "ContentView.refreshDatabaseStats")
                 // Set fallback stats on error
                 await MainActor.run {
                     self.databaseStats = DatabaseStats(
@@ -309,12 +168,6 @@ struct ContentView: View {
         )
     }
     
-    private func formatTimestamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: date)
-    }
-    
     private func formatBytes(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useKB, .useMB, .useGB]
@@ -335,6 +188,302 @@ enum DatabaseError: Error {
 }
 
 struct TimeoutError: Error {}
+
+// MARK: - Card Components
+
+struct HeaderCard: View {
+    let isRunning: Bool
+    let buildConfig: String
+    let buildTimestamp: String
+    let buildConfigColor: Color
+    let onQuit: () -> Void
+    
+    var body: some View {
+        CardContainer {
+            HStack {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .foregroundColor(.blue)
+                            .font(.title2)
+                        
+                        Text("Slunk Monitor")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        BuildBadge(config: buildConfig, color: buildConfigColor)
+                        
+                        Text("Built: \(buildTimestamp)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 8) {
+                    StatusIndicator(isRunning: isRunning)
+                    
+                    Button(action: onQuit) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "power")
+                            Text("Quit")
+                        }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.red)
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Exit application")
+                }
+            }
+        }
+    }
+}
+
+
+struct MCPConfigCard: View {
+    let config: String
+    let onCopy: () -> Void
+    
+    var body: some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "gear")
+                        .foregroundColor(.purple)
+                        .font(.title2)
+                    
+                    Text("MCP Server Configuration")
+                        .font(.headline)
+                        .fontWeight(.medium)
+                    
+                    Spacer()
+                    
+                    Button(action: onCopy) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.on.doc")
+                            Text("Copy")
+                        }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                ScrollView {
+                    Text(config)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Color(NSColor.textBackgroundColor))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
+                }
+                .frame(maxHeight: 120)
+            }
+        }
+    }
+}
+
+struct DatabaseStatsCard: View {
+    let stats: DatabaseStats?
+    let onRefresh: () -> Void
+    
+    var body: some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "cylinder.fill")
+                        .foregroundColor(.teal)
+                        .font(.title2)
+                    
+                    Text("Database Statistics")
+                        .font(.headline)
+                        .fontWeight(.medium)
+                    
+                    Spacer()
+                    
+                    Button(action: onRefresh) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Refresh")
+                        }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.teal.opacity(0.1))
+                        .foregroundColor(.teal)
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                if let stats = stats {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 16) {
+                        StatCard(
+                            icon: "message.fill",
+                            title: "Messages",
+                            value: "\(stats.messageCount.formatted())",
+                            color: .blue
+                        )
+                        
+                        StatCard(
+                            icon: "building.2.fill",
+                            title: "Workspaces",
+                            value: "\(stats.workspaceCount)",
+                            color: .green
+                        )
+                        
+                        StatCard(
+                            icon: "externaldrive.fill",
+                            title: "Database Size",
+                            value: stats.databaseSize,
+                            color: .orange
+                        )
+                    }
+                    
+                    HStack {
+                        Text("Last updated: \(formatTimestamp(stats.lastUpdated))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                } else {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading database statistics...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .padding(.vertical, 20)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Helper Components
+
+struct CardContainer<Content: View>: View {
+    let content: Content
+    
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+    
+    var body: some View {
+        content
+            .padding(20)
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.8))
+            .background(.ultraThinMaterial)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+}
+
+struct BuildBadge: View {
+    let config: String
+    let color: Color
+    
+    var body: some View {
+        Text(config)
+            .font(.caption2)
+            .fontWeight(.medium)
+            .foregroundColor(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.15))
+            .cornerRadius(4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(color.opacity(0.3), lineWidth: 1)
+            )
+    }
+}
+
+struct StatusIndicator: View {
+    let isRunning: Bool
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(isRunning ? Color.green : Color.red)
+                .frame(width: 10, height: 10)
+                .shadow(color: isRunning ? .green : .red, radius: 2)
+            
+            Text(isRunning ? "Active" : "Inactive")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(isRunning ? .green : .red)
+        }
+    }
+}
+
+struct StatCard: View {
+    let icon: String
+    let title: String
+    let value: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .foregroundColor(color)
+                .font(.title3)
+            
+            VStack(spacing: 2) {
+                Text(value)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(color.opacity(0.08))
+        .cornerRadius(8)
+    }
+}
+
+// MARK: - Helper Extensions
+
+private func formatTimestamp(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "HH:mm:ss"
+    return formatter.string(from: date)
+}
 
 #Preview {
     ContentView()

@@ -1,173 +1,5 @@
 import Foundation
 
-// JSON-RPC structures
-struct JSONRPCRequest: Codable {
-    let jsonrpc: String
-    let method: String
-    let params: [String: AnyCodable]?
-    let id: JSONRPCId
-    
-    enum CodingKeys: String, CodingKey {
-        case jsonrpc, method, params, id
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        jsonrpc = try container.decode(String.self, forKey: .jsonrpc)
-        method = try container.decode(String.self, forKey: .method)
-        params = try container.decodeIfPresent([String: AnyCodable].self, forKey: .params)
-        id = try container.decode(JSONRPCId.self, forKey: .id)
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(jsonrpc, forKey: .jsonrpc)
-        try container.encode(method, forKey: .method)
-        if let params = params {
-            try container.encode(params, forKey: .params)
-        }
-        try container.encode(id, forKey: .id)
-    }
-}
-
-struct JSONRPCResponse: Codable {
-    var jsonrpc: String = "2.0"
-    let result: AnyCodable?
-    let error: JSONRPCError?
-    let id: JSONRPCId
-    
-    init(result: Any? = nil, error: JSONRPCError? = nil, id: JSONRPCId) {
-        self.result = result.map { AnyCodable($0) }
-        self.error = error
-        self.id = id
-    }
-    
-    enum CodingKeys: String, CodingKey {
-        case jsonrpc, result, error, id
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        jsonrpc = try container.decodeIfPresent(String.self, forKey: .jsonrpc) ?? "2.0"
-        result = try container.decodeIfPresent(AnyCodable.self, forKey: .result)
-        error = try container.decodeIfPresent(JSONRPCError.self, forKey: .error)
-        id = try container.decode(JSONRPCId.self, forKey: .id)
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(jsonrpc, forKey: .jsonrpc)
-        try container.encodeIfPresent(result, forKey: .result)
-        try container.encodeIfPresent(error, forKey: .error)
-        try container.encode(id, forKey: .id)
-    }
-}
-
-struct JSONRPCError: Codable {
-    let code: Int
-    let message: String
-    let data: AnyCodable?
-    
-    init(code: Int, message: String, data: Any? = nil) {
-        self.code = code
-        self.message = message
-        self.data = data.map { AnyCodable($0) }
-    }
-    
-    enum CodingKeys: String, CodingKey {
-        case code, message, data
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        code = try container.decode(Int.self, forKey: .code)
-        message = try container.decode(String.self, forKey: .message)
-        data = try container.decodeIfPresent(AnyCodable.self, forKey: .data)
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(code, forKey: .code)
-        try container.encode(message, forKey: .message)
-        try container.encodeIfPresent(data, forKey: .data)
-    }
-}
-
-enum JSONRPCId: Codable {
-    case string(String)
-    case number(Int)
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let stringValue = try? container.decode(String.self) {
-            self = .string(stringValue)
-        } else if let numberValue = try? container.decode(Int.self) {
-            self = .number(numberValue)
-        } else {
-            throw DecodingError.typeMismatch(JSONRPCId.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected String or Int"))
-        }
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .string(let value):
-            try container.encode(value)
-        case .number(let value):
-            try container.encode(value)
-        }
-    }
-}
-
-// Helper for encoding Any types
-struct AnyCodable: Codable {
-    let value: Any
-    
-    init(_ value: Any) {
-        self.value = value
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        
-        if let dict = value as? [String: Any] {
-            try container.encode(dict.mapValues { AnyCodable($0) })
-        } else if let array = value as? [Any] {
-            try container.encode(array.map { AnyCodable($0) })
-        } else if let string = value as? String {
-            try container.encode(string)
-        } else if let bool = value as? Bool {
-            try container.encode(bool)
-        } else if let int = value as? Int {
-            try container.encode(int)
-        } else if let double = value as? Double {
-            try container.encode(double)
-        } else {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Unsupported type"))
-        }
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        
-        if let dict = try? container.decode([String: AnyCodable].self) {
-            value = dict.mapValues { $0.value }
-        } else if let array = try? container.decode([AnyCodable].self) {
-            value = array.map { $0.value }
-        } else if let string = try? container.decode(String.self) {
-            value = string
-        } else if let bool = try? container.decode(Bool.self) {
-            value = bool
-        } else if let int = try? container.decode(Int.self) {
-            value = int
-        } else if let double = try? container.decode(Double.self) {
-            value = double
-        } else {
-            throw DecodingError.typeMismatch(AnyCodable.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported type"))
-        }
-    }
-}
-
 class MCPServer {
     // MARK: - Constants
     private enum Constants {
@@ -323,13 +155,11 @@ class MCPServer {
         START HERE:
         └─ General search? → searchConversations
            └─ Too many results? → search_messages (add filters)
-           └─ Too few results? → intelligent_search (smarter parsing)
            └─ Want more? → suggest_related
         
         BY USE CASE:
         • "What did X say?" → search_messages + user filter
         • "Catch me up" → search_messages + channel/date filters  
-        • "How did we decide?" → intelligent_search
         • "What's trending?" → discover_patterns
         • "What does 👍 mean?" → get_message_context
         • "Show me the thread" → get_thread_context
@@ -418,20 +248,6 @@ class MCPServer {
                 ]
             ],
             [
-                "name": "intelligent_search",
-                "description": "BEST FOR: Complex analytical queries that need deep understanding. Automatically extracts intent, entities, and executes multi-step search strategies. USE WHEN: Other searches fail, need to find cause-effect relationships, decisions, or opinions. RETURNS: {query, parsedIntent, results[], extractedKeywords[], extractedEntities[]}. TIP: This is your power tool for 'why' and 'how' questions.",
-                "inputSchema": [
-                    "type": "object",
-                    "properties": [
-                        "query": ["type": "string", "description": "Complex question. Examples: 'How did we decide to migrate to Kubernetes?', 'What concerns were raised about the new pricing model?'"],
-                        "context": ["type": "string", "description": "Previous search context to build upon"],
-                        "refine_previous": ["type": "boolean", "default": false, "description": "Narrow down previous results"],
-                        "limit": ["type": "integer", "default": 15, "minimum": 1, "maximum": 50]
-                    ],
-                    "required": ["query"]
-                ]
-            ],
-            [
                 "name": "discover_patterns",
                 "description": "BEST FOR: Understanding team dynamics, trending topics, and communication patterns without specific search terms. USE WHEN: Starting research, understanding what's important to the team, or finding active discussion areas. RETURNS: {patterns: {topics[], participants[], communication[]}, timeRange, analysisDate}. TIP: Run this first to discover what to search for.",
                 "inputSchema": [
@@ -488,7 +304,7 @@ class MCPServer {
         📋 EXAMPLE WORKFLOWS:
         
         "Find how we decided on X":
-        1. intelligent_search → Find decision discussions
+        1. searchConversations → Find decision discussions
         2. get_thread_context → Read full threads
         3. suggest_related → Find follow-ups
         
@@ -505,7 +321,7 @@ class MCPServer {
         "Weekly catch-up":
         1. search_messages → Channel + date filter
         2. discover_patterns → Topic summary
-        3. intelligent_search → Key decisions
+        3. searchConversations → Key decisions
         """
         
         let response: [String: Any] = [
@@ -548,9 +364,6 @@ class MCPServer {
         case "parse_natural_query":
             return await handleParseNaturalQuery(arguments, id: request.id)
             
-        case "intelligent_search":
-            return await handleIntelligentSearch(arguments, id: request.id)
-            
         case "discover_patterns":
             return await handleDiscoverPatterns(arguments, id: request.id)
             
@@ -563,7 +376,7 @@ class MCPServer {
         default:
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32601, message: "Unknown tool: '\(name)'. Available tools: searchConversations, search_messages, get_thread_context, get_message_context, parse_natural_query, intelligent_search, discover_patterns, suggest_related, conversational_search. Use 'tools/list' to see full descriptions and parameters."),
+                error: JSONRPCError(code: -32601, message: "Unknown tool: '\(name)'. Available tools: searchConversations, search_messages, get_thread_context, get_message_context, parse_natural_query, discover_patterns, suggest_related, conversational_search. Use 'tools/list' to see full descriptions and parameters."),
                 id: request.id
             )
         }
@@ -663,7 +476,7 @@ class MCPServer {
         } catch {
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32603, message: "Search failed: \(error.localizedDescription). Try simplifying your query, using different keywords, or try the 'intelligent_search' tool for complex queries. If the error persists, the search service may need time to initialize."),
+                error: JSONRPCError(code: -32603, message: "Search failed: \(error.localizedDescription). Try simplifying your query, using different keywords, or try the 'conversational_search' tool for complex queries. If the error persists, the search service may need time to initialize."),
                 id: JSONRPCId.string(request.id)
             )
         }
@@ -1165,72 +978,6 @@ class MCPServer {
         return JSONRPCResponse(result: result, error: nil, id: id)
     }
     
-    internal func handleIntelligentSearch(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
-        guard let query = arguments["query"] as? String else {
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32602, message: "Missing required parameter: query"),
-                id: id
-            )
-        }
-        
-        let context = arguments["context"] as? String
-        let refinePrevious = arguments["refine_previous"] as? Bool ?? false
-        let limit = arguments["limit"] as? Int ?? 10
-        
-        // Check if query engine is available
-        guard let queryEngine = queryEngine else {
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32603, message: "Query engine not available"),
-                id: id
-            )
-        }
-        
-        do {
-            // Parse the natural language query
-            let parsedQuery = queryEngine.parseQuery(query)
-            
-            // For now, execute basic hybrid search
-            // TODO: Add context-aware refinement and multi-turn search
-            let searchResults = try await queryEngine.executeHybridSearch(parsedQuery, limit: limit)
-            
-            let results = searchResults.map { result in
-                [
-                    "title": result.summary.title,
-                    "summary": result.summary.summary,
-                    "combinedScore": result.combinedScore,
-                    "matchedKeywords": result.matchedKeywords,
-                    "semanticScore": result.semanticScore,
-                    "keywordScore": result.keywordScore
-                ] as [String: Any]
-            }
-            
-            let response = [
-                "query": query,
-                "parsedIntent": intentToString(parsedQuery.intent),
-                "extractedKeywords": parsedQuery.keywords,
-                "extractedEntities": parsedQuery.entities,
-                "extractedChannels": parsedQuery.channels,
-                "extractedUsers": parsedQuery.users,
-                "context": context as Any,
-                "refinePrevious": refinePrevious,
-                "results": results,
-                "resultCount": results.count,
-                "status": "Intelligent search complete with NLP processing"
-            ] as [String: Any]
-            
-            return JSONRPCResponse(result: response, error: nil, id: id)
-            
-        } catch {
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32603, message: "Intelligent search failed: \(error.localizedDescription)"),
-                id: id
-            )
-        }
-    }
-    
     internal func handleDiscoverPatterns(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
         let timeRange = arguments["time_range"] as? String ?? "week"
         let patternType = arguments["pattern_type"] as? String ?? "all"
@@ -1646,10 +1393,3 @@ class MCPServer {
 }
 
 // MARK: - Test Support Types
-
-struct MCPRequest {
-    let method: String
-    let params: [String: Any]
-    let jsonrpc: String = "2.0"
-    let id: String = UUID().uuidString
-}

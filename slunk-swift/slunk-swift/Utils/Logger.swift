@@ -50,6 +50,11 @@ class Logger {
         fileLogger?.log(message, category: "Database", type: .error)
     }
     
+    func logDatabaseCleanup(_ message: String, type: OSLogType = .info) {
+        os_log("%{public}@", log: databaseLog, type: type, message)
+        fileLogger?.log(message, category: "Database-Cleanup", type: type)
+    }
+    
     // MARK: - Query Logging
     
     func logQuery(_ query: String, resultCount: Int, duration: TimeInterval) {
@@ -74,6 +79,17 @@ class Logger {
     
     func logIngestionError(_ error: Error, title: String) {
         let message = "Ingestion error for '\(title)': \(error.localizedDescription)"
+        os_log("%{public}@", log: ingestionLog, type: .error, message)
+        fileLogger?.log(message, category: "Ingestion", type: .error)
+    }
+    
+    func logIngestionInfo(_ message: String) {
+        os_log("%{public}@", log: ingestionLog, type: .info, message)
+        fileLogger?.log(message, category: "Ingestion", type: .info)
+    }
+    
+    func logIngestionError(_ error: Error, context: String) {
+        let message = "Ingestion error in \(context): \(error.localizedDescription)"
         os_log("%{public}@", log: ingestionLog, type: .error, message)
         fileLogger?.log(message, category: "Ingestion", type: .error)
     }

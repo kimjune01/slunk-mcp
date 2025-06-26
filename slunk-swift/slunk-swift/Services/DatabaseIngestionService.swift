@@ -7,23 +7,27 @@ public final class DatabaseIngestionService {
     public init() {
     }
     
-    private func log(_ message: String) {
-        debugPrint(message)
+    private func logInfo(_ message: String) {
+        Logger.shared.logIngestionInfo(message)
+    }
+    
+    private func logError(_ error: Error, context: String) {
+        Logger.shared.logIngestionError(error, context: context)
     }
     
     /// Ingest a Slack conversation into the database
     public func ingestConversation(_ conversation: SlackConversation, to database: SlackDatabaseSchema) async {
-        log("🔧 Ingesting \(conversation.messages.count) messages to Slack database...")
-        log("📊 Database URL: \(database.databaseURL)")
+        logInfo("🔧 Ingesting \(conversation.messages.count) messages to Slack database...")
+        logInfo("📊 Database URL: \(database.databaseURL)")
         
         // Check if database is initialized
         if !database.isDatabaseOpen() {
-            log("❌ Database connection is not open - reinitializing...")
+            logInfo("❌ Database connection is not open - reinitializing...")
             do {
                 try await database.initializeDatabase()
-                log("✅ Database reinitialized")
+                logInfo("✅ Database reinitialized")
             } catch {
-                log("❌ Failed to reinitialize database: \(error)")
+                logError(error, context: "DatabaseIngestionService.reinitializeDatabase")
                 return
             }
         }
@@ -44,12 +48,12 @@ public final class DatabaseIngestionService {
                 
             } catch {
                 stats.errors += 1
-                log("⚠️ Failed to process message: \(error)")
+                logError(error, context: "DatabaseIngestionService.processMessage")
             }
         }
         
-        log("✅ Database ingestion complete!")
-        log("📊 New: \(stats.newMessages), Updates: \(stats.updates), Duplicates: \(stats.duplicates), Errors: \(stats.errors)")
+        logInfo("✅ Database ingestion complete!")
+        logInfo("📊 New: \(stats.newMessages), Updates: \(stats.updates), Duplicates: \(stats.duplicates), Errors: \(stats.errors)")
         
         // Save ingestion checkpoint
         saveIngestionCheckpoint(for: conversation)
@@ -78,17 +82,17 @@ public final class DatabaseIngestionService {
         case .new(let messageId):
             stats.newMessages += 1
             stats.totalProcessed += 1
-            log("✅ New message: \(messageId)")
+            logInfo("✅ New message: \(messageId)")
         case .duplicate:
             stats.duplicates += 1
             stats.totalProcessed += 1
         case .updated(let messageId):
             stats.updates += 1
             stats.totalProcessed += 1
-            log("📝 Updated existing message: \(messageId)")
+            logInfo("📝 Updated existing message: \(messageId)")
         case .reactionsUpdated(let messageId):
             stats.reactionUpdates += 1
-            log("🙂 Updated reactions: \(messageId)")
+            logInfo("🙂 Updated reactions: \(messageId)")
         }
     }
     
