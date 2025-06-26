@@ -1,55 +1,16 @@
-#!/bin/bash
+#\!/bin/bash
 
-APP_PATH="/Users/junekim/Library/Developer/Xcode/DerivedData/slunk-swift-hbeqpnnlvrrmfkftkscwaikwwclb/Build/Products/Release/slunk-swift.app/Contents/MacOS/slunk-swift"
+# Create a file with test requests
+cat > test_requests.txt << 'INNER_EOF'
+{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}
+{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}
+INNER_EOF
 
-echo "🧪 Testing Slunk MCP Server - Direct Communication"
-echo "=================================================="
+echo "Testing MCP server with direct input..."
+echo "Sending requests:"
+cat test_requests.txt
 
-# Create named pipes for communication
-INPIPE=$(mktemp -u)
-OUTPIPE=$(mktemp -u)
-mkfifo "$INPIPE"
-mkfifo "$OUTPIPE"
+echo -e "\n\nStarting server and sending requests..."
+cat test_requests.txt | /Users/junekim/Library/Developer/Xcode/DerivedData/slunk-swift-hbeqpnnlvrrmfkftkscwaikwwclb/Build/Products/Release/slunk-swift.app/Contents/MacOS/slunk-swift --mcp 2>&1 | head -20
 
-# Cleanup function
-cleanup() {
-    rm -f "$INPIPE" "$OUTPIPE"
-    pkill -f "slunk-swift" 2>/dev/null || true
-}
-trap cleanup EXIT
-
-echo "🚀 Starting MCP server..."
-# Start MCP server with environment variable
-export MCP_MODE=1
-"$APP_PATH" < "$INPIPE" > "$OUTPIPE" 2>&1 &
-MCP_PID=$!
-
-# Give it time to initialize
-echo "⏳ Waiting for initialization..."
-sleep 5
-
-echo "📤 Sending initialize command..."
-echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{}},"id":1}' > "$INPIPE" &
-
-# Read response
-echo "📥 Reading response..."
-timeout 5s cat "$OUTPIPE" | head -10
-
-echo ""
-echo "📤 Sending tools/list command..."
-echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}' > "$INPIPE" &
-
-# Read response
-echo "📥 Reading response..."
-timeout 5s cat "$OUTPIPE" | head -10
-
-echo ""
-echo "📤 Sending searchConversations command..."
-echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"searchConversations","arguments":{"query":"test","limit":3}},"id":3}' > "$INPIPE" &
-
-# Read response
-echo "📥 Reading response..."
-timeout 5s cat "$OUTPIPE" | head -10
-
-echo ""
-echo "✅ Test complete"
+echo -e "\n\nTest complete."

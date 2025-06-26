@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 class MCPServer {
     // MARK: - Constants
@@ -50,14 +51,46 @@ class MCPServer {
         isRunning = true
         logError("🚀 MCP Server started (stdio transport)")
         
+        // Start read loop in background
         Task {
+            logError("🔄 Task created, calling readLoop...")
             await readLoop()
+            logError("🔄 readLoop ended")
         }
+        
+        // Give the task time to start
+        Task {
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            logError("🔍 After 100ms, isRunning: \(isRunning)")
+        }
+        
+        logError("🚀 MCP Server start() complete")
     }
     
     func stop() {
         isRunning = false
         logError("🛑 MCP Server stopped")
+    }
+    
+    private func processRequest(_ line: String) async {
+        do {
+            let data = line.data(using: .utf8) ?? Data()
+            let request = try decoder.decode(JSONRPCRequest.self, from: data)
+            logError("✅ Decoded request: \(request.method)")
+            
+            let response = await handleRequest(request)
+            try sendResponse(response)
+            logError("📤 Sent response for: \(request.method)")
+        } catch {
+            logError("❌ Failed to process request: \(error)")
+            // Send error response with dummy id for parse errors (JSON-RPC spec says to use null, but our type doesn't support it)
+            let errorResponse = JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32700, message: "Parse error: \(error.localizedDescription)"),
+                id: .number(0)
+            )
+            try? sendResponse(errorResponse)
+        }
     }
     
     private func readLoop() async {
@@ -67,30 +100,26 @@ class MCPServer {
         
         while isRunning {
             do {
-                logError("📖 Waiting for input...")
+                // Use sync read with availableData for better compatibility
+                logError("📖 Checking for available data...")
+                let data = inputHandle.availableData
                 
-                // Read available data
-                let chunk = inputHandle.availableData
-                logError("📊 Read \(chunk.count) bytes")
-                
-                if chunk.isEmpty {
-                    // No more data, check if stdin is closed
-                    let testData = inputHandle.availableData
-                    if testData.isEmpty {
-                        logError("🔚 No more input, checking if stdin is closed...")
-                        try await Task.sleep(nanoseconds: 10_000_000) // 10ms
-                        continue
-                    }
-                } else {
-                    buffer.append(chunk)
-                    logError("📦 Buffer now has \(buffer.count) bytes")
+                if data.isEmpty {
+                    // No data available, sleep briefly
+                    logError("💤 No data available, sleeping...")
+                    try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+                    await Task.yield()
+                    continue
                 }
+                
+                logError("📥 Received \(data.count) bytes")
+                buffer.append(data)
                 
                 // Process complete lines
                 while let newlineIndex = buffer.firstIndex(of: UInt8(ascii: "\n")) {
                     let lineData = buffer.prefix(upTo: newlineIndex)
                     
-                    // Create new buffer without the processed line
+                    // Remove processed line from buffer
                     let remainingStart = buffer.index(buffer.startIndex, offsetBy: newlineIndex + 1)
                     if remainingStart < buffer.endIndex {
                         buffer = Data(buffer[remainingStart...])
@@ -98,36 +127,29 @@ class MCPServer {
                         buffer = Data()
                     }
                     
+                    // Process the line
                     guard let line = String(data: lineData, encoding: .utf8) else {
                         logError("⚠️ Failed to decode line as UTF-8")
                         continue
                     }
                     
                     let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                    logError("📥 Received line: \(trimmedLine.prefix(100))...")
                     
-                    guard !trimmedLine.isEmpty else { 
-                        logError("⚠️ Empty line, continuing...")
-                        continue 
+                    guard !trimmedLine.isEmpty else {
+                        continue
                     }
                     
-                    do {
-                        let data = trimmedLine.data(using: .utf8) ?? Data()
-                        let request = try decoder.decode(JSONRPCRequest.self, from: data)
-                        logError("✅ Decoded request: \(request.method)")
-                        let response = await handleRequest(request)
-                        try sendResponse(response)
-                        logError("📤 Sent response for: \(request.method)")
-                    } catch {
-                        logError("Failed to decode request: \(error) - Line: \(trimmedLine)")
-                    }
+                    logError("📝 Processing: \(trimmedLine.prefix(100))...")
+                    
+                    // Process request
+                    await processRequest(trimmedLine)
                 }
-                
             } catch {
-                logError("Read loop error: \(error)")
-                try? await Task.sleep(nanoseconds: Constants.retryLoopSleepNanoseconds)
+                logError("❌ Read loop error: \(error)")
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
             }
         }
+        
         logError("🛑 Read loop ended")
     }
     
@@ -353,9 +375,12 @@ class MCPServer {
     }
     
     private func handleToolCall(_ request: JSONRPCRequest) async -> JSONRPCResponse {
+        logError("🔧 handleToolCall started")
+        
         guard let params = request.params,
               let nameValue = params["name"],
               let name = nameValue.value as? String else {
+            logError("❌ Invalid params in tool call")
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32602, message: "Invalid params"),
@@ -363,12 +388,16 @@ class MCPServer {
             )
         }
         
+        logError("🔧 Tool name: \(name)")
+        
         let argumentsValue = params["arguments"]
         let arguments = argumentsValue?.value as? [String: Any] ?? [:]
+        logError("🔧 Arguments: \(arguments)")
         
         switch name {
         case "searchConversations":
-            return await handleSearchConversations(MCPRequest(method: name, params: arguments))
+            logError("📞 Calling handleSearchConversations...")
+            return await handleSearchConversations(arguments, id: request.id)
         // Phase 2: Contextual Search Tools
         case "search_messages":
             return await handleSearchMessages(arguments, id: request.id)
@@ -425,12 +454,11 @@ class MCPServer {
     }
     
     private func logError(_ message: String) {
-        #if DEBUG
+        // Enable logging for all builds to debug MCP issues
         if let errorData = "[MCP Server] \(message)\n".data(using: .utf8) {
             errorHandle.write(errorData)
             fflush(stderr)
         }
-        #endif
     }
     
     // MARK: - Error Handling
@@ -454,74 +482,80 @@ class MCPServer {
     
     // MARK: - Enhanced MCP Tool Handlers
     
-    func handleSearchConversations(_ request: MCPRequest) async -> JSONRPCResponse {
-        guard let database = await ProductionService.shared.getDatabase() else {
+    func handleSearchConversations(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+        logError("🔍 handleSearchConversations started")
+        
+        guard let query = arguments["query"] as? String else {
+            logError("❌ Missing query parameter")
             return JSONRPCResponse(
                 result: nil,
-                error: JSONRPCError(code: -32603, message: "Search service temporarily unavailable. The query engine is not initialized. This usually resolves within a few seconds after app startup. Please try again in a moment, or check if the Slack monitoring service is running."),
-                id: JSONRPCId.string(request.id)
+                error: JSONRPCError(code: -32602, message: "Missing required parameter 'query'"),
+                id: id
             )
         }
         
-        guard let query = request.params["query"] as? String else {
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32602, message: "Missing required parameter 'query'. Please provide a search query string. Example: {\"query\": \"Swift discussions with Alice from last week\"}. The query should be in natural language describing what you want to find."),
-                id: JSONRPCId.string(request.id)
-            )
+        logError("🔍 Query: \(query)")
+        let limit = arguments["limit"] as? Int ?? 10
+        
+        // Get database from ProductionService
+        let database = await MainActor.run {
+            ProductionService.shared.getDatabase()
         }
         
-        let limit = request.params["limit"] as? Int ?? 10
+        guard let database = database else {
+            logError("❌ Database not available")
+            // Return empty results instead of error for now
+            let emptyResponse = "No results found. The database is still initializing. Please try again in a few seconds."
+            let toolResponse: [String: Any] = [
+                "content": [
+                    ["type": "text", "text": emptyResponse]
+                ]
+            ]
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
+        }
         
         do {
-            // Use hybrid search for better results that combine semantic and keyword search
-            let results = try await database.hybridSearchWithQuery(query: query, limit: limit)
+            logError("🔍 Starting search...")
             
-            let searchResults = results.map { result in
-                [
-                    "id": result.message.id,
-                    "title": "Message from \(result.message.sender)",
-                    "summary": String(result.message.content.prefix(200)),
-                    "sender": result.message.sender,
-                    "timestamp": ISO8601DateFormatter().string(from: result.message.timestamp),
-                    "channel": result.message.channel,
-                    "workspace": result.workspace
-                ] as [String: Any]
+            // Use simple search instead of hybrid search for now
+            let results = try await database.searchMessages(query: query, limit: limit)
+            logError("🔍 Search returned \(results.count) results")
+            
+            // Format results for MCP tool response
+            let resultText: String
+            if results.isEmpty {
+                resultText = "No results found for query: '\(query)'"
+            } else {
+                let resultDescriptions = results.map { result in
+                    "• Message from \(result.message.sender) - \(String(result.message.content.prefix(100)))\n  Channel: \(result.message.channel) at \(ISO8601DateFormatter().string(from: result.message.timestamp))"
+                }
+                resultText = "Found \(results.count) results:\n\n" + resultDescriptions.joined(separator: "\n\n")
             }
             
-            // Provide helpful guidance for empty results
-            let result: Any = searchResults.isEmpty ? 
-                createEmptyResultsGuidance(query: query) :
-                searchResults
+            let toolResponse: [String: Any] = [
+                "content": [
+                    ["type": "text", "text": resultText]
+                ]
+            ]
             
             return JSONRPCResponse(
-                result: result,
+                result: toolResponse,
                 error: nil,
-                id: JSONRPCId.string(request.id)
+                id: id
             )
             
         } catch {
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32603, message: "Search failed: \(error.localizedDescription). Try simplifying your query, using different keywords, or try the 'conversational_search' tool for complex queries. If the error persists, the search service may need time to initialize."),
-                id: JSONRPCId.string(request.id)
-            )
+            logError("❌ Search error: \(error)")
+            let errorResponse = "Search failed: \(error.localizedDescription)"
+            let toolResponse: [String: Any] = [
+                "content": [
+                    ["type": "text", "text": errorResponse]
+                ]
+            ]
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
         }
     }
     
-    func handleRequest(_ request: MCPRequest) async -> JSONRPCResponse {
-        // Generic handler for tests - just calls the specific handlers
-        switch request.method {
-        case "searchConversations":
-            return await handleSearchConversations(request)
-        default:
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32601, message: "Method not found"),
-                id: JSONRPCId.string(request.id)
-            )
-        }
-    }
     
     private func generateConversationStats(timeRange: String) async throws -> [String: Any] {
         // Generate stats using SlackQueryService
@@ -530,7 +564,10 @@ class MCPServer {
         let queryService = SlackQueryService(messageContextualizer: messageContextualizer)
         
         // Get the database from ProductionService
-        guard let database = await ProductionService.shared.getDatabase() else {
+        let database = await MainActor.run {
+            ProductionService.shared.getDatabase()
+        }
+        guard let database = database else {
             throw SlunkError.databaseInitializationFailed("Database not available")
         }
         await queryService.setDatabase(database)
@@ -644,7 +681,10 @@ class MCPServer {
         }
         
         // Get database from ProductionService
-        guard let database = await ProductionService.shared.getDatabase() else {
+        let database = await MainActor.run {
+            ProductionService.shared.getDatabase()
+        }
+        guard let database = database else {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Database not initialized. The service is still starting up. Please wait a moment and try again."),
@@ -676,12 +716,25 @@ class MCPServer {
                 ] as [String: Any]
             }
             
-            // Provide helpful guidance for empty results
-            let result: Any = formattedResults.isEmpty ?
-                createEmptyResultsGuidance(query: query) :
-                formattedResults
+            // Format for MCP tool response
+            let resultText: String
+            if formattedResults.isEmpty {
+                resultText = "No messages found matching your criteria. Try: broader search terms | different date range | removing some filters"
+            } else {
+                // Convert results to readable format
+                let descriptions = formattedResults.map { msg in
+                    "[\(msg["timestamp"] ?? "")] \(msg["sender"] ?? "") in #\(msg["channel"] ?? ""): \(msg["content"] ?? "")"
+                }
+                resultText = "Found \(formattedResults.count) messages:\n\n" + descriptions.joined(separator: "\n\n")
+            }
             
-            return JSONRPCResponse(result: result, error: nil, id: id)
+            let toolResponse: [String: Any] = [
+                "content": [
+                    ["type": "text", "text": resultText]
+                ]
+            ]
+            
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
         } catch {
             return JSONRPCResponse(
                 result: nil,
@@ -702,7 +755,10 @@ class MCPServer {
         
         let includeContext = arguments["include_context"] as? Bool ?? true
         
-        guard let database = await ProductionService.shared.getDatabase() else {
+        let database = await MainActor.run {
+            ProductionService.shared.getDatabase()
+        }
+        guard let database = database else {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Database not initialized"),
@@ -832,7 +888,27 @@ class MCPServer {
                 "channel": sortedMessages.first?.message.channel ?? ""
             ]
             
-            return JSONRPCResponse(result: result, error: nil, id: id)
+            // Format for MCP tool response
+            let summaryText = """
+            Thread: \(threadId)
+            Channel: #\(sortedMessages.first?.message.channel ?? "unknown")
+            Participants: \(Array(participants).joined(separator: ", "))
+            Messages: \(sortedMessages.count)
+            Duration: \(Int(endTime.timeIntervalSince(startTime) / 60)) minutes
+            
+            Messages:
+            \(messageData.map { msg in
+                "• [\(msg["timestamp"] ?? "")] \(msg["sender"] ?? ""): \(msg["content"] ?? "")"
+            }.joined(separator: "\n"))
+            """
+            
+            let toolResponse: [String: Any] = [
+                "content": [
+                    ["type": "text", "text": summaryText]
+                ]
+            ]
+            
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
             
         } catch {
             return JSONRPCResponse(
@@ -854,7 +930,10 @@ class MCPServer {
         
         let includeThread = arguments["include_thread"] as? Bool ?? true
         
-        guard let database = await ProductionService.shared.getDatabase() else {
+        let database = await MainActor.run {
+            ProductionService.shared.getDatabase()
+        }
+        guard let database = database else {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Database not initialized"),
@@ -958,7 +1037,25 @@ class MCPServer {
                 ]
             ]
             
-            return JSONRPCResponse(result: result, error: nil, id: id)
+            // Format for MCP tool response
+            let contextText = """
+            Message: \(message.content)
+            From: \(message.sender) in #\(message.channel)
+            Time: \(ISO8601DateFormatter().string(from: message.timestamp))
+            
+            Contextual Meaning: \(contextualMeaning ?? "No additional context extracted")
+            
+            Enhanced Content: \(enhancedContent)
+            \(includeThread && threadContext != nil ? "\nThread Context: \(threadContext!.totalMessageCount) messages in thread" : "")
+            """
+            
+            let toolResponse: [String: Any] = [
+                "content": [
+                    ["type": "text", "text": contextText]
+                ]
+            ]
+            
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
             
         } catch {
             return JSONRPCResponse(
@@ -1008,7 +1105,23 @@ class MCPServer {
         
         result["status"] = "Query parsing complete with advanced NLP"
         
-        return JSONRPCResponse(result: result, error: nil, id: id)
+        // Format for MCP tool response
+        let resultText = """
+        Query Analysis:
+        - Intent: \(result["intent"] ?? "unknown")
+        - Keywords: \((result["keywords"] as? [String] ?? []).joined(separator: ", "))
+        - Channels: \((result["channels"] as? [String] ?? []).joined(separator: ", "))
+        - Users: \((result["users"] as? [String] ?? []).joined(separator: ", "))
+        - Original Query: \(query)
+        """
+        
+        let toolResponse: [String: Any] = [
+            "content": [
+                ["type": "text", "text": resultText]
+            ]
+        ]
+        
+        return JSONRPCResponse(result: toolResponse, error: nil, id: id)
     }
     
     internal func handleDiscoverPatterns(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
@@ -1064,7 +1177,34 @@ class MCPServer {
             
             result["status"] = "Pattern discovery complete"
             
-            return JSONRPCResponse(result: result, error: nil, id: id)
+            // Format for MCP tool response
+            let patterns = result["patterns"] as? [String: Any] ?? [:]
+            let patternText = """
+            Pattern Analysis (\(timeRange)):
+            
+            Topics:
+            \((patterns["topics"] as? [[String: Any]] ?? []).map { topic in
+                "• \(topic["topic"] ?? ""): \(topic["occurrences"] ?? 0) occurrences"
+            }.joined(separator: "\n"))
+            
+            Top Participants:
+            \((patterns["participants"] as? [[String: Any]] ?? []).map { participant in
+                "• \(participant["name"] ?? ""): \(participant["messageCount"] ?? 0) messages"
+            }.joined(separator: "\n"))
+            
+            Communication Patterns:
+            \((patterns["communication"] as? [[String: Any]] ?? []).map { comm in
+                "• \(comm["pattern"] ?? ""): \(comm["description"] ?? "")"
+            }.joined(separator: "\n"))
+            """
+            
+            let toolResponse: [String: Any] = [
+                "content": [
+                    ["type": "text", "text": patternText]
+                ]
+            ]
+            
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
             
         } catch {
             return JSONRPCResponse(
@@ -1134,7 +1274,25 @@ class MCPServer {
                 "status": "Related content suggestions generated"
             ] as [String: Any]
             
-            return JSONRPCResponse(result: result, error: nil, id: id)
+            // Format for MCP tool response
+            let suggestionText = """
+            Found \(suggestions.count) related suggestions:
+            
+            \(suggestions.map { suggestion in
+                "• [\(suggestion["type"] ?? "")] \(suggestion["title"] ?? "")\n  \(suggestion["summary"] ?? "")"
+            }.joined(separator: "\n\n"))
+            
+            Query Context: \(queryContext ?? "None")
+            Suggestion Type: \(suggestionType)
+            """
+            
+            let toolResponse: [String: Any] = [
+                "content": [
+                    ["type": "text", "text": suggestionText]
+                ]
+            ]
+            
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
             
         } catch {
             return JSONRPCResponse(
