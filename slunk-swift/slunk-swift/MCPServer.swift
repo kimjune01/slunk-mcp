@@ -314,40 +314,6 @@ class MCPServer {
                     "required": ["query"]
                 ]
             ],
-            [
-                "name": "ingestText",
-                "description": "Ingest new text content with automatic keyword extraction and embedding generation",
-                "inputSchema": [
-                    "type": "object",
-                    "properties": [
-                        "content": ["type": "string", "description": "The text content to ingest"],
-                        "title": ["type": "string", "description": "Title or subject of the content"],
-                        "summary": ["type": "string", "description": "Brief summary of the content"],
-                        "sender": ["type": "string", "description": "Name or identifier of the content sender"],
-                        "timestamp": ["type": "string", "description": "ISO 8601 timestamp (optional, defaults to current time)"]
-                    ],
-                    "required": ["content", "title", "summary"]
-                ]
-            ],
-            [
-                "name": "getConversationStats",
-                "description": "Get analytics and statistics about stored conversations",
-                "inputSchema": [
-                    "type": "object",
-                    "properties": [
-                        "timeRange": ["type": "string", "description": "Time range for stats: 'day', 'week', 'month', 'all'", "default": "all"]
-                    ]
-                ]
-            ],
-            [
-                "name": "swiftVersion",
-                "description": "Returns the current Swift version installed on the system",
-                "inputSchema": [
-                    "type": "object",
-                    "properties": [:],
-                    "required": []
-                ]
-            ],
             // Phase 2: Contextual Search Tools
             [
                 "name": "search_messages",
@@ -488,18 +454,6 @@ class MCPServer {
         switch name {
         case "searchConversations":
             return await handleSearchConversations(MCPRequest(method: name, params: arguments))
-            
-        case "ingestText":
-            return await handleIngestText(MCPRequest(method: name, params: arguments))
-            
-        case "swiftVersion":
-            let version = MCPServer.swiftVersion() ?? "Unknown"
-            return JSONRPCResponse(
-                result: ["content": [["type": "text", "text": version]]],
-                error: nil,
-                id: request.id
-            )
-            
         // Phase 2: Contextual Search Tools
         case "search_messages":
             return await handleSearchMessages(arguments, id: request.id)
@@ -610,75 +564,11 @@ class MCPServer {
         }
     }
     
-    func handleIngestText(_ request: MCPRequest) async -> JSONRPCResponse {
-        guard let smartIngestion = smartIngestion else {
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32603, message: "Ingestion service not available"),
-                id: JSONRPCId.string(request.id)
-            )
-        }
-        
-        guard let content = request.params["content"] as? String,
-              let title = request.params["title"] as? String,
-              let summary = request.params["summary"] as? String else {
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32602, message: "Missing required parameters: content, title, summary"),
-                id: JSONRPCId.string(request.id)
-            )
-        }
-        
-        let sender = request.params["sender"] as? String
-        let timestamp: Date?
-        
-        if let timestampString = request.params["timestamp"] as? String {
-            timestamp = ISO8601DateFormatter().date(from: timestampString)
-        } else {
-            timestamp = nil
-        }
-        
-        do {
-            let result = try await smartIngestion.ingestText(
-                content: content,
-                title: title,
-                summary: summary,
-                sender: sender,
-                timestamp: timestamp
-            )
-            
-            let response = [
-                "id": result.summaryId,
-                "keywords": result.extractedKeywords,
-                "embeddingDimensions": result.embeddingDimensions,
-                "processingTime": result.processingTime
-            ] as [String: Any]
-            
-            return JSONRPCResponse(
-                result: response,
-                error: nil,
-                id: JSONRPCId.string(request.id)
-            )
-            
-        } catch {
-            return JSONRPCResponse(
-                result: nil,
-                error: JSONRPCError(code: -32603, message: "Ingestion failed: \(error.localizedDescription)"),
-                id: JSONRPCId.string(request.id)
-            )
-        }
-    }
-    
-    
     func handleRequest(_ request: MCPRequest) async -> JSONRPCResponse {
         // Generic handler for tests - just calls the specific handlers
         switch request.method {
         case "searchConversations":
             return await handleSearchConversations(request)
-        case "ingestText":
-            return await handleIngestText(request)
-        case "getConversationStats":
-            return await handleGetConversationStats(request)
         default:
             return JSONRPCResponse(
                 result: nil,
@@ -1387,21 +1277,6 @@ class MCPServer {
         }
     }
     
-    static func swiftVersion() -> String? {
-        // Since we're in an App Sandbox, we can't execute external processes
-        // Instead, return the Swift version this app was compiled with
-        #if swift(>=6.1)
-            return "Apple Swift version 6.1+ (compiled with this app)\nTarget: arm64-apple-macosx\nNote: App is sandboxed, cannot execute external swift command"
-        #elseif swift(>=6.0)
-            return "Apple Swift version 6.0+ (compiled with this app)\nTarget: arm64-apple-macosx\nNote: App is sandboxed, cannot execute external swift command"
-        #elseif swift(>=5.9)
-            return "Apple Swift version 5.9+ (compiled with this app)\nTarget: arm64-apple-macosx\nNote: App is sandboxed, cannot execute external swift command"
-        #elseif swift(>=5.8)
-            return "Apple Swift version 5.8+ (compiled with this app)\nTarget: arm64-apple-macosx\nNote: App is sandboxed, cannot execute external swift command"
-        #else
-            return "Apple Swift version 5.x+ (compiled with this app)\nTarget: arm64-apple-macosx\nNote: App is sandboxed, cannot execute external swift command"
-        #endif
-    }
 }
 
 // MARK: - Test Support Types
