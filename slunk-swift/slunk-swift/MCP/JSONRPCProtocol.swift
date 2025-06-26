@@ -94,7 +94,7 @@ struct JSONRPCError: Codable {
     }
 }
 
-enum JSONRPCId: Codable {
+enum JSONRPCId: Codable, Equatable {
     case string(String)
     case number(Int)
     

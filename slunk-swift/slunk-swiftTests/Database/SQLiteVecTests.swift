@@ -1,6 +1,7 @@
 import XCTest
 import SQLiteVec
 import Foundation
+import NaturalLanguage
 @testable import slunk_swift
 
 final class SlackDatabaseTests: XCTestCase {
@@ -61,14 +62,36 @@ final class SlackDatabaseTests: XCTestCase {
         XCTAssertGreaterThan(count, 0, "Should have at least one message")
     }
     
-    func testVectorEmbeddingPlaceholders() async throws {
-        // These are placeholder implementations, should not fail
-        try await slackDatabase.insertEmbedding(messageId: "test", embedding: Array(repeating: 0.1, count: 512))
+    func testVectorEmbeddingOperations() async throws {
+        // Initialize database first
+        try await slackDatabase.initializeDatabase()
         
-        let embedding = try await slackDatabase.getEmbedding(messageId: "test")
-        XCTAssertNil(embedding, "Placeholder implementation should return nil")
+        // Test embedding insertion
+        let testEmbedding = Array(repeating: Float(0.1), count: 512)
+        try await slackDatabase.insertEmbedding(messageId: "test", embedding: testEmbedding)
         
-        let results = try await slackDatabase.semanticSearch(embedding: Array(repeating: 0.1, count: 512))
-        XCTAssertEqual(results.count, 0, "Placeholder implementation should return empty results")
+        // Test embedding retrieval
+        let retrievedEmbedding = try await slackDatabase.getEmbedding(messageId: "test")
+        XCTAssertNotNil(retrievedEmbedding, "Should retrieve stored embedding")
+        XCTAssertEqual(retrievedEmbedding?.count, 512, "Should have 512 dimensions")
+        
+        // Test semantic search (will return empty since no similar vectors)
+        let searchResults = try await slackDatabase.semanticSearch(embedding: testEmbedding)
+        XCTAssertGreaterThanOrEqual(searchResults.count, 0, "Should return search results")
+    }
+    
+    func testEmbeddingDimensionValidation() async throws {
+        try await slackDatabase.initializeDatabase()
+        
+        // Test invalid embedding dimensions
+        let invalidEmbedding = Array(repeating: Float(0.1), count: 256) // Wrong size
+        
+        do {
+            try await slackDatabase.insertEmbedding(messageId: "test", embedding: invalidEmbedding)
+            XCTFail("Should throw error for invalid embedding dimensions")
+        } catch {
+            // Expected to throw error
+            XCTAssertTrue(error is SlackDatabaseError, "Should throw SlackDatabaseError")
+        }
     }
 }

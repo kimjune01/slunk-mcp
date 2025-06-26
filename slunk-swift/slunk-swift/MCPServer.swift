@@ -436,8 +436,8 @@ class MCPServer {
         let limit = request.params["limit"] as? Int ?? 10
         
         do {
-            // TODO: Implement proper query parsing when available
-            let results = try await database.searchMessages(query: query, limit: limit)
+            // Use hybrid search for better results that combine semantic and keyword search
+            let results = try await database.hybridSearchWithQuery(query: query, limit: limit)
             
             let searchResults = results.map { result in
                 [

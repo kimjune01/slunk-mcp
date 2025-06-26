@@ -11,29 +11,31 @@ struct slunk_swiftApp: App {
         let isMCPMode = args.contains("--mcp") || ProcessInfo.processInfo.environment["MCP_MODE"] != nil
         
         if isMCPMode {
-            // Run as MCP server only
-            let mcpServer = MCPServer()
-            
-            // Initialize database before starting server
-            Task {
+            // Run as MCP server only - do this synchronously
+            Task { @MainActor in
                 do {
                     // Initialize the production service to set up database
-                    let productionService = await ProductionService.shared
+                    print("[MCP] Initializing database...")
+                    let productionService = ProductionService.shared
                     try await productionService.initialize()
+                    print("[MCP] Database initialized successfully")
                     
-                    // Start MCP server after database is ready
+                    // Create and start MCP server after database is ready
+                    let mcpServer = MCPServer()
+                    print("[MCP] Starting MCP server...")
                     mcpServer.start()
+                    
+                    // Keep the process running for MCP communication
+                    dispatchMain()
+                    
                 } catch {
-                    print("Failed to initialize database: \(error)")
+                    print("[MCP] Failed to initialize: \(error)")
                     exit(1)
                 }
             }
             
-            // Keep the app running
-            RunLoop.main.run()
-            
-            // Exit to prevent GUI from starting
-            exit(0)
+            // This prevents the SwiftUI app from starting
+            return
         }
     }
     
