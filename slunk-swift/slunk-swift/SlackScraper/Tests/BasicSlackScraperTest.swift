@@ -119,7 +119,7 @@ public struct SlackScraperTests {
         let service = SlackMonitoringService.shared
         
         // Test initial state
-        if !service.isActive {
+        if !service.isMonitoring {
             print("✅ Initial state test passed")
         } else {
             print("❌ Initial state test failed")

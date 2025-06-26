@@ -100,7 +100,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = menu
         
         // Update menu status periodically
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak statusItem] _ in
+            guard let statusItem = statusItem else { return }
             Task {
                 await self.updateMenuStatus(statusItem)
             }
@@ -109,8 +110,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc func toggleMonitoring() {
         Task {
-            let isActive = await SlackMonitoringService.shared.isActive
-            if isActive {
+            let isMonitoring = await SlackMonitoringService.shared.isMonitoring
+            if isMonitoring {
                 await SlackMonitoringService.shared.stopMonitoring()
             } else {
                 await SlackMonitoringService.shared.startMonitoring()
@@ -120,8 +121,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc func toggleBackgroundMonitoring() {
         Task {
-            let current = await SlackMonitoringService.shared.isBackgroundMonitoringEnabled
-            await SlackMonitoringService.shared.setBackgroundMonitoringEnabled(!current)
+            let status = await SlackMonitoringService.shared.getStatusInfo()
+            await SlackMonitoringService.shared.setBackgroundMonitoringEnabled(!status.contentParsingEnabled)
         }
     }
     
@@ -170,7 +171,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func quit() {
         Task {
             await SlackMonitoringService.shared.stopMonitoring()
-            NSApp.terminate(nil)
+            await MainActor.run {
+                NSApp.terminate(nil)
+            }
         }
     }
     
