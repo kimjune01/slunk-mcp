@@ -22,102 +22,257 @@ This plan addresses the gaps between the designed MCP query interface (`mcp-quer
 5. `analyze_slack_trends` - Pattern analysis and trends
 6. `query_slack_relationships` - User interaction networks
 
-## Implementation Strategy
+## Critical Analysis & Improved Strategy
 
-### **Phase 1: Foundation Enhancement (1-2 days)**
-*Goal: Bridge existing Slack schema with search capabilities*
+### **🚨 Interface Design Issues Identified**
+1. **Tool Confusion**: Multiple similar tools (structured/semantic/hybrid) create decision paralysis
+2. **Parameter Overload**: Too many optional parameters overwhelm users and agents
+3. **Real User Disconnect**: Users want to "find information", not choose query types
+4. **Implementation Risk**: Building 3 complex tools simultaneously increases failure risk
+
+### **🎯 Improved Interface Design**
+**Leveraging vector database for powerful semantic + structured search:**
+- `searchSlackMessages()` - hybrid semantic/structured search with SQLiteVec
+- `getSlackChannels()` - channel discovery with filters
+- `summarizeConversation()` - focused conversation analysis
+- `findRelatedConversations()` - semantic similarity discovery (Phase 3 bonus)
+
+### **📋 Success-Focused Implementation Strategy**
+
+#### **👤 USER REVIEW POINTS** 
+**You will be pulled in for review and approval at these critical junctions:**
+
+1. **🔍 After Phase 1**: Review basic query functionality with real Slack data
+2. **🛠️ After Phase 2.1**: Test unified search tool with sample agent queries  
+3. **📊 After Phase 2.2**: Validate channel discovery meets real use cases
+4. **✅ After Phase 3**: Final review before production deployment
+
+### **Phase 1: Foundation + Proof of Concept (1-2 days)**
+*Goal: Build structured query infrastructure with NO natural language processing*
 
 #### 1.1 Slack Database Query Layer
 **File**: `slunk-swift/slunk-swift/Database/SlackQueryService.swift` (new)
 
 **Implementation Steps**:
-1. Create `SlackQueryService` class with methods:
+1. Create `SlackQueryService` class with contextual search methods:
+   - `searchBySemantic(embedding: [Float], minSimilarity: Float)` - vector search
    - `filterByChannels(channels: [String])`
    - `filterByUsers(users: [String])`
    - `filterByMessageTypes(types: [MessageType])`
    - `filterByTimeRange(from: Date, to: Date)`
-2. Integrate with existing `SQLiteVecSchema`
+   - `filterByReactions(hasReactions: Bool)`
+   - `filterByAttachments(hasAttachments: Bool)`
+
+2. **Contextual Embedding Enhancement**:
+   - `buildThreadContext(message: SlackMessage)` - include parent/thread messages
+   - `createConversationChunks(messages: [SlackMessage])` - group related messages
+   - `enhanceMessageForEmbedding(message: SlackMessage)` - add channel/thread context
+
+3. SQLiteVec integration:
+   - Store both original and contextual embeddings
+   - Use enhanced embeddings for semantic search
+   - Support conversation-level and message-level search
 
 **Test Strategy**:
 ```swift
 // Tests: SlackQueryServiceTests.swift
+func testSemanticSearch()
+func testThreadContextBuilding()
+func testConversationChunking()
+func testContextualEmbeddings()
 func testChannelFiltering()
 func testUserFiltering() 
-func testMessageTypeFiltering()
-func testTimeRangeFiltering()
+func testSemanticWithFilters()
+func testShortMessageContext()
 ```
 
 **Verification**:
-- All filter types work independently
-- Filter combinations work correctly
-- Unit tests pass
+- Thread context improves short message relevance
+- Conversation chunks group related messages correctly
+- Contextual embeddings outperform raw message embeddings
+- Semantic search returns meaningful results for emoji/short responses
 
-#### 1.2 Enhanced Search Integration
+#### 1.2 Contextual Message Processing
+**File**: `slunk-swift/slunk-swift/Services/MessageContextualizer.swift` (new)
+
+**Implementation Steps**:
+1. **Thread Context Enhancement**:
+   ```swift
+   func enhanceWithThreadContext(message: SlackMessage) -> String {
+       guard let threadId = message.threadId else { return message.text }
+       
+       let threadMessages = getThreadMessages(threadId)
+       let parentMessage = threadMessages.first?.text ?? ""
+       let recentContext = threadMessages.suffix(3).map(\.text).joined(separator: " ")
+       
+       return """
+       Thread context: \(parentMessage)
+       Recent: \(recentContext)
+       Current: \(message.text)
+       Channel: \(message.channelTopic)
+       """
+   }
+   ```
+
+2. **Conversation Chunking**:
+   ```swift
+   func createConversationChunks(messages: [SlackMessage]) -> [ConversationChunk] {
+       // Group messages by:
+       // - Time proximity (within 10 minutes)
+       // - Topic similarity (using keywords)
+       // - User interaction patterns
+       // - Thread relationships
+   }
+   
+   struct ConversationChunk {
+       let id: String
+       let topic: String          // "API deployment discussion"
+       let messages: [SlackMessage]
+       let summary: String        // Generated summary for embedding
+       let timeRange: DateRange
+       let participants: [String]
+   }
+   ```
+
+3. **Enhanced Embedding Pipeline**:
+   - Process messages through context enhancement
+   - Generate embeddings for both individual messages and chunks
+   - Store multiple embedding types in SQLiteVec
+
+#### 1.3 Query Combination and Ranking
 **File**: Extend `slunk-swift/slunk-swift/Database/SlackQueryService.swift` (same file)
 
 **Implementation Steps**:
-1. Add to `SlackQueryService` class:
-   - `searchWithFilters(semanticQuery: String?, filters: SlackFilters, scope: SearchScope)`
-   - `combineSemanticAndStructured(semanticResults: [Result], filteredResults: [Result])`
-2. Define clear parameter structures and enums for filters and scopes
-3. Connect to existing `NaturalLanguageQueryEngine` when semantic query is provided
+1. Add hybrid query methods:
+   - `executeHybridSearch(semantic: SemanticQuery?, filters: SearchFilters, mode: SearchMode)`
+   - `combineResults(messageResults: [Result], chunkResults: [Result], mode: SearchMode)`
+   - `rankByRelevance(results: [Result], semanticScores: [Float]?)`
+   - `addMessageContext(messages: [Message], includeContext: Bool)`
+
+2. Search modes with contextual support:
+   - `semantic`: Search both contextual messages and conversation chunks
+   - `structured`: Traditional filtering with context awareness
+   - `hybrid`: Intelligent combination with context weighting
 
 **Test Strategy**:
 ```swift
-// Tests: SlackQueryServiceTests.swift (extended)
-func testStructuredFilteringOnly()
-func testSemanticAndStructuredCombination()
-func testScopeFiltering()
+// Tests: MessageContextualizerTests.swift
+func testThreadContextGeneration()
+func testConversationChunkCreation()
+func testShortMessageEnhancement()
+func testContextualEmbeddingQuality()
+func testChunkVsMessageSearch()
 ```
 
 **Verification**:
-- Structured filtering works independently
-- Semantic + structured combination works
-- Scope filtering routes correctly
+- Thread context significantly improves short message search
+- Conversation chunks capture related discussion topics
+- Contextual embeddings outperform raw message embeddings
+- Search works at both message and conversation levels
 
-### **Phase 2: Core Query Tools (2-3 days)**
-*Goal: Implement the 3 most critical missing tools*
+### **Phase 2: MCP Tools Implementation (2-3 days)**
+*Goal: Build structured MCP tools that agents can use directly*
 
-#### 2.1 `query_slack_structured`
+#### 2.1 `searchSlackMessages` - Hybrid Semantic/Structured Search Tool ⭐
 **File**: `slunk-swift/slunk-swift/MCPServer.swift` (extend)
 
 **Implementation Steps**:
-1. Add tool definition in `MCPServer.swift` with parameters:
+1. **Replace existing `searchConversations`** with powerful hybrid tool:
 ```swift
 @mcp.tool
-func querySlackStructured(
-    channels: [String]? = nil,
-    users: [String]? = nil, 
-    messageTypes: [String]? = nil,
+func searchSlackMessages(
+    // Semantic search options
+    semanticQuery: String? = nil,      // "deployment issues and rollbacks"
+    similarToMessageId: String? = nil, // Find messages similar to this one
+    
+    // Structured filters (applied on top)
+    channels: [String]? = nil,         // ["engineering", "bugs"]
+    users: [String]? = nil,            // ["john.doe", "jane.smith"]
+    timeRange: TimeRange? = nil,       // {from: "2024-01-15", to: "2024-01-22"}
+    messageTypes: [String]? = nil,     // ["text", "thread_reply", "file_share"]
     hasAttachments: Bool? = nil,
     hasReactions: Bool? = nil,
-    threadRepliesOnly: Bool? = nil,
-    timeRange: TimeRange? = nil,
-    sortBy: String = "timestamp",
+    
+    // Search control
+    searchMode: String = "hybrid",      // "semantic", "structured", "hybrid"
+    minSimilarity: Float = 0.7,        // Similarity threshold (0-1)
+    includeContext: Bool = false,      // include surrounding messages
+    sortBy: String = "relevance",      // "relevance", "timestamp", "reactions"
     limit: Int = 20
-) -> MCPResult
+) -> SlackSearchResult
 ```
 
-2. Connect to `SlackQueryService.searchWithFilters()`
-3. Format results according to design document JSON structure
+2. **Contextual Hybrid Search Implementation**:
+   - When `semanticQuery`: Generate embedding → search contextual messages AND conversation chunks
+   - When `similarToMessageId`: Get contextual embedding → find similar discussions/replies
+   - Apply structured filters on top of semantic results
+   - Intelligent ranking combining context relevance with traditional scores
+
+3. **Enhanced Response Format with Context**:
+```json
+{
+  "results": [
+    {
+      "message_id": "1234567890.123456",
+      "channel": "#engineering",
+      "user": "john.doe",
+      "timestamp": "2024-01-20T10:30:00Z",
+      "text": "👍",
+      "contextual_meaning": "Approval of API deployment proposal",
+      "thread_context": {
+        "parent_message": "Should we deploy the API changes today?",
+        "thread_summary": "Team discussing API deployment timing and readiness"
+      },
+      "similarity_score": 0.92,     // contextual similarity score
+      "relevance_score": 0.95,      // combined score
+      "matched_concepts": ["deployment", "approval", "API"],
+      "result_type": "contextual_message",  // or "conversation_chunk"
+      "context": {
+        "before": [...],  // if includeContext=true
+        "after": [...]
+      }
+    }
+  ],
+  "conversation_chunks": [
+    {
+      "chunk_id": "conv_123",
+      "topic": "API deployment discussion",
+      "message_count": 8,
+      "participants": ["john.doe", "jane.smith"],
+      "time_range": {"start": "...", "end": "..."},
+      "summary": "Team discussed API deployment timing, ran tests, and approved for deployment",
+      "key_messages": ["1234567890.123456", "1234567890.234567"]
+    }
+  ],
+  "metadata": {
+    "total_results": 47,
+    "contextual_matches": 32,     // results improved by context
+    "chunk_matches": 15,          // conversation-level matches
+    "search_type": "hybrid",
+    "context_enhancement": true
+  }
+}
+```
 
 **Test Strategy**:
 ```swift
-// Tests: MCPServerStructuredQueryTests.swift
-func testBasicChannelFiltering()
-func testUserFiltering()
-func testMessageTypeFiltering() 
-func testAttachmentFiltering()
-func testReactionFiltering()
-func testTimeRangeFiltering()
-func testSortingOptions()
-func testComplexFilterCombinations()
+// Tests: ContextualSearchTests.swift  
+func testContextualSemanticSearch()
+func testShortMessageContextualMatching()
+func testConversationChunkSearch()
+func testThreadContextSearch()
+func testHybridContextualMode()
+func testSimilarityWithContext()
+func testContextualInsights()
+func testEmojiAndShortResponseSearch()
 ```
 
-**Verification**:
-- All filter parameters work correctly
-- JSON-RPC responses match design format
-- Tool integrates properly with MCP server
+**🔍 USER REVIEW CHECKPOINT 1**:
+- Test that "👍" in deployment thread matches "deployment approval"
+- Validate conversation chunks group related discussions
+- Confirm contextual embeddings dramatically improve short message search
+- Verify thread context provides meaningful semantic understanding
+- Approve contextual approach before proceeding to channels tool
 
 #### 2.2 `get_slack_channels`
 **File**: `slunk-swift/slunk-swift/MCPServer.swift` (extend)
@@ -155,82 +310,101 @@ func testArchivedChannelHandling()
 - Filtering accurately matches criteria
 - Response format matches design
 
-#### 2.3 Enhanced `query_slack_hybrid`
-**File**: `slunk-swift/slunk-swift/MCPServer.swift` (extend existing `searchConversations`)
+**📊 USER REVIEW CHECKPOINT 2**:
+- Test channel discovery with real workspace
+- Validate filtering options meet actual needs
+- Verify response format supports common workflows
+- Approve channel tool before proceeding
 
-**Implementation Steps**:
-1. Modify existing `searchConversations` tool to accept additional parameters:
-```swift
-@mcp.tool
-func searchConversations(
-    query: String,                    // existing semantic query
-    channels: [String]? = nil,        // new structured filters
-    users: [String]? = nil,
-    hasReactions: Bool? = nil,
-    timeRange: TimeRange? = nil,
-    semanticWeight: Double = 0.7,     // weight semantic vs structured
-    limit: Int = 10
-) -> MCPResult
-```
+### **Phase 3: Advanced Semantic Features (2-3 days)**
+*Goal: Add conversation analysis and semantic discovery*
 
-2. Use `SlackQueryService.searchWithFilters()` to combine semantic and structured results
-3. Implement result ranking based on `semanticWeight` parameter
-
-**Test Strategy**:
-```swift
-// Tests: MCPServerHybridQueryTests.swift
-func testSemanticOnlyQuery()
-func testStructuredOnlyQuery()
-func testHybridWeighting()
-func testResultRanking()
-```
-
-**Verification**:
-- Existing semantic search still works
-- Structured filters integrate properly
-- Weighting affects result ranking as expected
-
-### **Phase 3: Advanced Features (3-4 days)**
-*Goal: Implement conversation summarization*
-
-#### 3.1 `get_conversation_summary`
+#### 3.1 `summarizeConversation` - Structured Conversation Analysis
 **Files**: 
 - `slunk-swift/slunk-swift/Services/ConversationSummarizer.swift` (new)
 - `slunk-swift/slunk-swift/MCPServer.swift` (extend)
 
 **Implementation Steps**:
-1. Create `ConversationSummarizer` class with methods:
-   - `summarizeConversation(conversationId: String, summaryType: SummaryType)`
-   - `extractActionItems(messages: [SlackMessage])`
-   - `extractDecisions(messages: [SlackMessage])`
-
-2. Add MCP tool in `MCPServer.swift`:
+1. **Focused Analysis Tool**:
 ```swift
 @mcp.tool
-func getConversationSummary(
-    conversationId: String,           // channel ID or thread timestamp
-    timeRange: TimeRange? = nil,
-    summaryType: String = "brief",    // "brief", "detailed", "action_items", "decisions"
-    maxLength: Int? = nil
-) -> MCPResult
+func summarizeConversation(
+    channelId: String,                // channel ID (required)
+    timeRange: TimeRange? = nil,      // specific time window
+    focusKeywords: [String]? = nil,   // focus summary on specific topics
+    summaryType: String = "brief",    // "brief", "action_items", "key_points"
+    maxPoints: Int = 10               // max items to extract
+) -> ConversationSummary
 ```
 
-3. Use simple keyword/pattern extraction for action items and decisions (no external AI needed initially)
+2. **Pattern-Based Extraction** (no AI/NLP needed):
+   - Extract messages matching action patterns ("TODO", "will do", "assigned to")
+   - Find decision patterns ("decided", "agreed", "resolved") 
+   - Count message frequency by participant
+   - Group related messages by time proximity
+
+3. **Structured Output**:
+```json
+{
+  "channel_id": "C1234567890",
+  "time_range": {"from": "2024-01-20T00:00:00Z", "to": "2024-01-20T23:59:59Z"},
+  "summary": {
+    "total_messages": 156,
+    "participants": [
+      {"user": "john.doe", "message_count": 45},
+      {"user": "jane.smith", "message_count": 38}
+    ],
+    "key_points": [
+      "API authentication bug identified in auth module",
+      "Deployment scheduled for Friday 2pm"
+    ],
+    "action_items": [
+      {"text": "TODO: Fix auth module bug", "user": "john.doe", "timestamp": "..."}
+    ],
+    "decisions": [
+      {"text": "Agreed to use OAuth2 for authentication", "timestamp": "..."}
+    ]
+  }
+}
+```
 
 **Test Strategy**:
 ```swift
 // Tests: ConversationSummarizerTests.swift
-func testBriefSummaryGeneration()
-func testDetailedSummaryGeneration()
+func testBasicSummaryGeneration()
 func testActionItemExtraction()
-func testDecisionExtraction()
-func testSummaryLength()
+func testKeyPointExtraction()
+func testParticipantIdentification()
 ```
 
-**Verification**:
-- Summaries capture key conversation points
-- Different summary types produce distinct outputs
-- Tool integrates with MCP server
+#### 3.2 `findRelatedConversations` - Semantic Discovery Tool (Bonus)
+**File**: `slunk-swift/slunk-swift/MCPServer.swift` (extend)
+
+**Implementation Steps**:
+1. **Semantic similarity discovery**:
+```swift
+@mcp.tool
+func findRelatedConversations(
+    referenceMessages: [String],        // Message IDs to use as reference
+    conceptExpansion: Bool = true,      // Expand search to related concepts
+    channels: [String]? = nil,          // Optional channel filter
+    timeRange: TimeRange? = nil,
+    minSimilarity: Float = 0.75,
+    limit: Int = 10
+) -> RelatedConversationsResult
+```
+
+2. **Implementation using vectors**:
+   - Average embeddings of reference messages
+   - Find similar message clusters
+   - Group by conversation threads
+   - Return related discussions across channels
+
+**✅ USER REVIEW CHECKPOINT 3**:
+- Test summarization with real Slack conversations
+- Validate semantic discovery finds truly related content
+- Confirm tools integrate well together
+- Final approval for production deployment
 
 ### **Phase 4: Polish & Optimization (1-2 days)**
 *Goal: Integration testing and MCP protocol compliance*
@@ -283,25 +457,32 @@ func testEdgeCaseHandling()
 
 ## Success Criteria
 
-### **Phase 1 Success**
-- [ ] Slack database queries work with all filter types
-- [ ] Search integration connects semantic and structured queries
+### **Success Criteria by Phase**
+
+#### **Phase 1 Success** ✅
+- [ ] **USER REVIEW CHECKPOINT**: Query infrastructure validated with real Slack data
+- [ ] Database filtering works for all parameter types
+- [ ] Search integration handles semantic + structured queries
 - [ ] All unit tests pass
 
-### **Phase 2 Success**
-- [ ] `query_slack_structured` fully functional with all designed parameters
-- [ ] `get_slack_channels` returns accurate channel information
-- [ ] Enhanced `query_slack_hybrid` improves result quality
-- [ ] All tools pass integration tests
+#### **Phase 2 Success** ✅  
+- [ ] **USER REVIEW CHECKPOINT 1**: `searchSlackMessages` tool tested with agent-generated parameters
+- [ ] **USER REVIEW CHECKPOINT 2**: Channel discovery validated with real workspace
+- [ ] Structured search produces accurate results without NLP
+- [ ] Response format is clear and predictable
+- [ ] All parameter combinations work correctly
 
-### **Phase 3 Success**
-- [ ] `get_conversation_summary` generates useful summaries
-- [ ] Advanced features integrate smoothly with existing tools
+#### **Phase 3 Success** ✅
+- [ ] **USER REVIEW CHECKPOINT 3**: Conversation summarization tested with real data
+- [ ] Summary quality meets user expectations
+- [ ] Tool integrates seamlessly with search workflow
+- [ ] **FINAL APPROVAL** for production deployment
 
-### **Phase 4 Success**
-- [ ] Comprehensive test suite passes
+#### **Phase 4 Success** ✅
+- [ ] All integration tests pass
 - [ ] MCP protocol compliance verified
-- [ ] Ready for production use
+- [ ] Documentation complete
+- [ ] Ready for production use with user confidence
 
 ## Risk Mitigation
 
@@ -313,29 +494,98 @@ func testEdgeCaseHandling()
 - **Complexity creep**: Strict phase boundaries, incremental delivery
 - **Test coverage gaps**: Test-first development
 
-## Final Approved Implementation Plan Summary
+## 🎯 Revised Implementation Plan Summary
 
-### **Phase 1: Foundation Enhancement (1-2 days)**
-✅ **Step 1.1**: Create `SlackQueryService.swift` with structured filtering methods  
-✅ **Step 1.2**: Extend same file with search integration (no separate bridge file)
+### **Key Improvements Made**
+- **Leverages Vector Database**: Full semantic search using SQLiteVec embeddings
+- **Hybrid Approach**: Combines power of semantic + precision of structured search
+- **Agent-Friendly**: Clear parameters with multiple search modes
+- **Risk Reduction**: Added 4 critical user review checkpoints
+- **Success-Focused**: Early validation with real data and testing
 
-### **Phase 2: Core Query Tools (2-3 days)**  
-✅ **Step 2.1**: Add `query_slack_structured` MCP tool with comprehensive filtering  
-✅ **Step 2.2**: Add `get_slack_channels` MCP tool for channel discovery  
-✅ **Step 2.3**: Enhance existing `searchConversations` with structured filters (hybrid)
+### **👤 USER REVIEW SCHEDULE**
+1. **After Phase 1**: Validate structured query infrastructure with real Slack data
+2. **After Phase 2.1**: Test search tool with agent-generated parameters
+3. **After Phase 2.2**: Verify channel discovery meets real workspace needs
+4. **After Phase 3**: Final approval before production deployment
 
-### **Phase 3: Advanced Features (3-4 days)**
-✅ **Step 3.1**: Add `get_conversation_summary` MCP tool with basic summarization  
-~~Step 3.2~~: Skipped analytics tool
+### **📅 Revised Timeline**
+- **Phase 1**: Structured Query Foundation (1-2 days) → **USER REVIEW 1**
+- **Phase 2**: MCP Tools Implementation (2-3 days) → **USER REVIEWS 2 & 3** 
+- **Phase 3**: Conversation Summarization (2-3 days) → **FINAL APPROVAL**
+- **Phase 4**: Polish & Integration Testing (1-2 days)
 
-### **Phase 4: Polish & Optimization (1-2 days)**
-✅ **Step 4.1**: Integration testing and MCP protocol compliance
+### **🔧 Final Tool Set (Contextual Semantic + Structured)**
+1. **`searchSlackMessages()`** - Contextual hybrid search with thread/conversation awareness
+2. **`getSlackChannels()`** - Channel discovery with filters
+3. **`summarizeConversation()`** - Pattern-based conversation analysis
+4. **`findRelatedConversations()`** - Contextual semantic similarity discovery (bonus)
 
 ## Next Steps
 
-1. **Immediate**: Begin Phase 1, Step 1.1 implementation
-2. **Per Step**: Run tests and verify functionality
-3. **Per Phase**: Comprehensive testing and verification
-4. **Final**: Integration with Claude Desktop for real-world testing
+1. **Immediate**: Begin Phase 1 with basic query infrastructure
+2. **Critical**: Stop at each USER REVIEW checkpoint for validation
+3. **Iterative**: Refine based on real usage feedback
+4. **Success Metric**: User approval at each checkpoint before proceeding
 
-This plan provides a clear, testable path from the current implementation to the core designed query interface, with verification points at every step to ensure quality and functionality.
+### **🚀 Why This Contextual Approach Solves Key Problems**
+
+**Solves the Short Message Problem:**
+- "👍" in deployment thread → "deployment approval confirmation"
+- "LGTM" in code review → "code review approval"
+- "🚨" in incident channel → "urgent incident alert"
+
+**Provides Conversation-Level Discovery:**
+- Search for "API issues" → finds entire discussion threads
+- Not just individual mentions, but complete conversations
+- Groups related messages across time
+
+**For Agents (like me):**
+- Can find meaningful responses to emoji queries
+- Thread context makes semantic search actually useful
+- Conversation chunks provide better similarity matching
+- Much higher quality results for semantic queries
+
+**For Implementation:**
+- Builds on existing SQLiteVec infrastructure
+- Enhances current embeddings rather than replacing
+- Clear separation between contextual and raw search
+- Testable improvements (before/after context quality)
+
+**For Users:**
+- "Find approvals" actually finds approval emojis in context
+- Short response search finally works meaningfully
+- Conversation discovery vs just message fragments
+- Dramatically better semantic search quality
+
+**Contextual Search Examples:**
+
+```swift
+// Find approvals (now works with emoji!)
+searchSlackMessages(
+    semanticQuery: "approval confirmation agreed",
+    searchMode: "semantic"  // Finds "👍", "LGTM", "approved", etc. in context
+)
+
+// Discover related conversations
+searchSlackMessages(
+    semanticQuery: "API deployment discussions",
+    searchMode: "hybrid"    // Returns conversation chunks about API deployment
+)
+
+// Find similar responses to a specific approval
+searchSlackMessages(
+    similarToMessageId: "msg_123_thumbs_up",  // contextual embedding
+    channels: ["engineering"]
+)
+
+// Structured search still works exactly the same
+searchSlackMessages(
+    channels: ["api"],
+    users: ["john.doe"],
+    timeRange: TimeRange(last: "1d"),
+    searchMode: "structured"
+)
+```
+
+This contextual approach transforms semantic search from "interesting but unreliable" to "actually useful for real Slack queries" while maintaining all existing structured search capabilities.
