@@ -4,27 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Slunk is a hybrid project consisting of:
-1. A Python-based MCP (Model Context Protocol) server using FastMCP
-2. A Swift/SwiftUI macOS application with Slack monitoring and accessibility features
+Slunk is a Swift/SwiftUI macOS application with Slack monitoring and accessibility features that includes MCP (Model Context Protocol) server capabilities.
 
 ## Development Commands
-
-### Python MCP Server
-
-```bash
-# Run the MCP server
-uv run server.py
-
-# Install dependencies
-uv pip install -r requirements.txt
-
-# Run linting
-uv run ruff check .
-
-# Format code
-uv run ruff format .
-```
 
 ### Swift Application
 
@@ -40,12 +22,6 @@ xcodebuild test -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift
 ```
 
 ## Architecture
-
-### MCP Server (`server.py`)
-- Uses FastMCP framework to create an MCP server named "slunk"
-- Currently implements a single `ping_slunk` tool
-- Configured to run via `uv` in `claude-config.json`
-- Entry point: `server.py:14` - `mcp.run()`
 
 ### Swift Application
 - Standard SwiftUI macOS app structure
@@ -97,10 +73,6 @@ xcodebuild test -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift
   - **Input validation**: Rejects empty/whitespace text with proper error messages
 
 ### Project Configuration
-- Python dependencies managed by `uv` (see `pyproject.toml` and `uv.lock`)
-- MCP server integration configured in `claude-config.json`
-- Python 3.13+ required
-- Ruff configured with 88-character line length
 
 #### Swift Package Dependencies
 - **SQLiteVec**: Vector search extension for SQLite
