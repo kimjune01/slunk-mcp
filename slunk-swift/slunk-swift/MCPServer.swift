@@ -89,7 +89,14 @@ class MCPServer {
                 // Process complete lines
                 while let newlineIndex = buffer.firstIndex(of: UInt8(ascii: "\n")) {
                     let lineData = buffer.prefix(upTo: newlineIndex)
-                    buffer.removeFirst(newlineIndex + 1)
+                    
+                    // Create new buffer without the processed line
+                    let remainingStart = buffer.index(buffer.startIndex, offsetBy: newlineIndex + 1)
+                    if remainingStart < buffer.endIndex {
+                        buffer = Data(buffer[remainingStart...])
+                    } else {
+                        buffer = Data()
+                    }
                     
                     guard let line = String(data: lineData, encoding: .utf8) else {
                         logError("⚠️ Failed to decode line as UTF-8")
@@ -342,13 +349,7 @@ class MCPServer {
         3. searchConversations → Key decisions
         """
         
-        let response: [String: Any] = [
-            "tools": tools,
-            "toolSelectionGuide": toolSelectionGuide,
-            "toolChainExamples": toolChainExamples
-        ]
-        
-        return JSONRPCResponse(result: response, error: nil, id: request.id)
+        return JSONRPCResponse(result: ["tools": tools], error: nil, id: request.id)
     }
     
     private func handleToolCall(_ request: JSONRPCRequest) async -> JSONRPCResponse {
