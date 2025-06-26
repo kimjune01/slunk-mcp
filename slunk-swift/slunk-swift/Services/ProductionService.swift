@@ -11,7 +11,7 @@ class ProductionService: ObservableObject {
     @Published var lastError: Error?
     @Published var statistics: ServiceStatistics?
     
-    private var schema: SQLiteVecSchema?
+    private var schema: SlackDatabaseSchema?
     private var queryEngine: NaturalLanguageQueryEngine?
     private var smartIngestion: SmartIngestionService?
     private var dataSeeder: DataSeeder?
@@ -29,8 +29,7 @@ class ProductionService: ObservableObject {
         do {
             // Initialize database
             Logger.shared.logDatabaseOperation("Initializing production database")
-            let dbPath = Configuration.shared.databaseURL.path
-            schema = SQLiteVecSchema(databasePath: dbPath)
+            schema = try SlackDatabaseSchema()
             
             guard let schema = schema else {
                 throw SlunkError.databaseInitializationFailed("Schema creation failed")
@@ -38,41 +37,17 @@ class ProductionService: ObservableObject {
             
             try await schema.initializeDatabase()
             
-            // Apply optimizations
-            if FeatureFlags.isDatabaseOptimizationEnabled {
-                let optimizer = DatabaseOptimizer()
-                try await optimizer.applyOptimizations(to: schema)
-                try await optimizer.optimizeIndexes(on: schema)
-                Logger.shared.logDatabaseOperation("Database optimizations applied")
-            }
-            
-            // Initialize services
-            queryEngine = NaturalLanguageQueryEngine()
-            queryEngine?.setDatabase(schema)
-            
-            smartIngestion = SmartIngestionService()
-            await smartIngestion?.setDatabase(schema)
-            
-            dataSeeder = DataSeeder()
-            await dataSeeder?.setDatabase(schema)
+            // Note: Database optimizations and services are designed for SQLiteVecSchema
+            // For Slack-specific functionality, we use SlackDatabaseSchema directly
+            Logger.shared.logDatabaseOperation("Using SlackDatabaseSchema for Slack message storage")
             
             // Initialize cleanup service for Slack database
-            // Note: We'll need to check if we're working with Slack data and create appropriate schema
             cleanupService = DatabaseCleanupService.shared
-            // TODO: Integrate cleanup service when SlackDatabaseSchema is available
+            cleanupService?.setDatabase(schema)
             Logger.shared.logDatabaseOperation("Database cleanup service configured")
             
-            // Seed initial data if needed
-            if FeatureFlags.isDataSeedingEnabled && !UserDefaultsManager.shared.onboardingCompleted {
-                await seedInitialData()
-                UserDefaultsManager.shared.onboardingCompleted = true
-            }
-            
-            // Load statistics
-            await loadStatistics()
-            
-            // Start maintenance timer
-            startMaintenanceTimer()
+            // For Slack monitoring, no seeding or complex features needed
+            Logger.shared.logDatabaseOperation("SlackDatabaseSchema ready for Slack monitoring")
             
             isInitialized = true
             Logger.shared.logDatabaseOperation("Production service initialized successfully")
@@ -86,48 +61,14 @@ class ProductionService: ObservableObject {
     
     // MARK: - Public Methods
     
-    func getDatabase() -> SQLiteVecSchema? {
+    func getDatabase() -> SlackDatabaseSchema? {
         return schema
     }
     
     func search(query: String) async throws -> [QueryResult] {
-        guard isInitialized else {
-            throw SlunkError.databaseInitializationFailed("Service not initialized")
-        }
-        
-        let timer = PerformanceTimer(operation: "search")
-        defer { timer.stop() }
-        
-        do {
-            // Validate input
-            let sanitizedQuery = try InputSanitizer.validateInput(
-                query,
-                maxLength: Configuration.Query.maxQueryLength
-            )
-            
-            // Parse and execute query
-            guard let engine = queryEngine else {
-                throw SlunkError.resourceNotFound("Query engine not available")
-            }
-            
-            let parsedQuery = engine.parseQuery(sanitizedQuery)
-            let results = try await engine.safeExecuteHybridSearch(
-                parsedQuery,
-                limit: UserDefaultsManager.shared.preferredQueryLimit
-            )
-            
-            // Update statistics
-            UserDefaultsManager.shared.incrementQueryCount()
-            timer.addMetadata(key: "resultCount", value: results.count)
-            
-            Logger.shared.logQuery(sanitizedQuery, resultCount: results.count, duration: 0)
-            
-            return results
-            
-        } catch {
-            Logger.shared.logQueryError(error, query: query)
-            throw error
-        }
+        // Search functionality not implemented for SlackDatabaseSchema
+        // This ProductionService instance is used for Slack monitoring only
+        throw SlunkError.resourceNotFound("Search not available with SlackDatabaseSchema")
     }
     
     func ingest(
@@ -182,11 +123,14 @@ class ProductionService: ObservableObject {
             throw SlunkError.databaseInitializationFailed("Service not initialized")
         }
         
-        guard let schema = schema else {
-            throw SlunkError.resourceNotFound("Database not available")
-        }
-        
-        return try await loadStatisticsFromDatabase(schema)
+        // Statistics not implemented for SlackDatabaseSchema
+        return ServiceStatistics(
+            totalConversations: 0,
+            totalEmbeddings: 0,
+            totalQueries: 0,
+            totalIngestions: 0,
+            databaseSize: 0
+        )
     }
     
     // MARK: - Private Methods
@@ -208,28 +152,16 @@ class ProductionService: ObservableObject {
     }
     
     private func loadStatistics() async {
-        guard let schema = schema else { return }
-        
-        do {
-            statistics = try await loadStatisticsFromDatabase(schema)
-        } catch {
-            Logger.shared.logError(error, context: "loadStatistics")
-        }
-    }
-    
-    private func loadStatisticsFromDatabase(_ schema: SQLiteVecSchema) async throws -> ServiceStatistics {
-        let stats = try await schema.getTableStatistics()
-        let summariesCount = stats["text_summaries"]?.rowCount ?? 0
-        let embeddingsCount = stats["summary_embeddings"]?.rowCount ?? 0
-        
-        return ServiceStatistics(
-            totalConversations: summariesCount,
-            totalEmbeddings: embeddingsCount,
-            totalQueries: UserDefaultsManager.shared.totalQueries,
-            totalIngestions: UserDefaultsManager.shared.totalIngestions,
-            databaseSize: try await schema.getDatabaseSize()
+        // Statistics not implemented for SlackDatabaseSchema
+        statistics = ServiceStatistics(
+            totalConversations: 0,
+            totalEmbeddings: 0,
+            totalQueries: 0,
+            totalIngestions: 0,
+            databaseSize: 0
         )
     }
+    
     
     private func startMaintenanceTimer() {
         maintenanceTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in
@@ -238,26 +170,9 @@ class ProductionService: ObservableObject {
     }
     
     private func performMaintenance() async {
-        guard let schema = schema else { return }
-        
-        // Check if vacuum needed
-        let lastVacuum = UserDefaultsManager.shared.lastVacuumDate ?? Date.distantPast
-        let timeSinceVacuum = Date().timeIntervalSince(lastVacuum)
-        
-        if timeSinceVacuum > Configuration.Database.vacuumInterval {
-            do {
-                Logger.shared.logDatabaseOperation("Performing scheduled maintenance")
-                
-                let optimizer = DatabaseOptimizer()
-                try await optimizer.performVacuum(on: schema)
-                try await optimizer.performAnalyze(on: schema)
-                
-                UserDefaultsManager.shared.lastVacuumDate = Date()
-                Logger.shared.logDatabaseOperation("Maintenance completed")
-            } catch {
-                Logger.shared.logDatabaseError(error, context: "performMaintenance")
-            }
-        }
+        // Maintenance not implemented for SlackDatabaseSchema
+        // Database cleanup is handled by DatabaseCleanupService instead
+        Logger.shared.logDatabaseOperation("Maintenance skipped - using DatabaseCleanupService for Slack data")
         
         // Check memory pressure
         if FeatureFlags.isMemoryMonitoringEnabled {

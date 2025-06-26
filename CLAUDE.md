@@ -187,4 +187,4 @@ echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"swiftVersion","ar
 echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"searchConversations","arguments":{"query":"test message","limit":5}},"id":4}' | /path/to/slunk-swift.app/Contents/MacOS/slunk-swift
 ```
 
-The app's UI provides a "Copy Config" button that generates the complete MCP client configuration JSON ready for use in `claude_desktop_config.json`.
+The app's UI provides a "Copy Config" button that generates the complete MCP server configuration JSON ready for use in `claude_desktop_config.json`.

@@ -35,9 +35,35 @@ public final class SlackMonitoringService: ObservableObject {
     private let vectorService = ProductionService.shared
     private let cleanupService = DatabaseCleanupService.shared
     
+    // MARK: - Debug Logging
+    private let logFileURL: URL = {
+        let logsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        return logsDir.appendingPathComponent("slunk_debug.log")
+    }()
+    
     // MARK: - Public Interface
     
     private init() {}
+    
+    private func logToFile(_ message: String) {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let logMessage = "[\(timestamp)] \(message)\n"
+        
+        if let data = logMessage.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: logFileURL.path) {
+                if let fileHandle = try? FileHandle(forWritingTo: logFileURL) {
+                    fileHandle.seekToEndOfFile()
+                    fileHandle.write(data)
+                    fileHandle.closeFile()
+                }
+            } else {
+                try? data.write(to: logFileURL)
+            }
+        }
+        
+        // Also print to console
+        print(message)
+    }
     
     /// Start monitoring Slack application
     public func startMonitoring() async {
@@ -46,22 +72,22 @@ public final class SlackMonitoringService: ObservableObject {
             return
         }
         
-        print("ℹ️ Starting Slack monitoring service")
+        logToFile("ℹ️ Starting Slack monitoring service")
         
         // Initialize vector database service
         do {
             try await vectorService.initialize()
-            print("✅ Vector database initialized for Slack ingestion")
+            logToFile("✅ Vector database initialized for Slack ingestion")
             
             // Initialize cleanup service for Slack database management
             if let database = vectorService.getDatabase() as? SlackDatabaseSchema {
                 cleanupService.setDatabase(database)
                 cleanupService.startPeriodicCleanup()
-                print("✅ Database cleanup service started (2-month retention)")
+                logToFile("✅ Database cleanup service started (2-month retention)")
             }
         } catch {
-            print("⚠️ Vector database initialization failed: \(error)")
-            print("   Monitoring will continue but data won't be persisted")
+            logToFile("⚠️ Vector database initialization failed: \(error)")
+            logToFile("   Monitoring will continue but data won't be persisted")
         }
         
         // Check accessibility permissions first
@@ -313,14 +339,14 @@ public final class SlackMonitoringService: ObservableObject {
     
     /// Handle successfully extracted Slack content
     private func handleExtractedContent(_ conversation: SlackConversation) async {
-        print("   📋 CONTENT EXTRACTED!")
-        print("      Workspace: \(conversation.workspace)")
-        print("      Channel: \(conversation.channel) (\(conversation.channelType))")
-        print("      Messages: \(conversation.messages.count)")
+        logToFile("   📋 CONTENT EXTRACTED!")
+        logToFile("      Workspace: \(conversation.workspace)")
+        logToFile("      Channel: \(conversation.channel) (\(conversation.channelType))")
+        logToFile("      Messages: \(conversation.messages.count)")
         
         // Show recent message info for debugging
         if let recentMessage = conversation.messages.last {
-            print("      Latest: [\(recentMessage.sender)] \(String(recentMessage.content.prefix(50)))\(recentMessage.content.count > 50 ? "..." : "")")
+            logToFile("      Latest: [\(recentMessage.sender)] \(String(recentMessage.content.prefix(50)))\(recentMessage.content.count > 50 ? "..." : "")")
         }
         
         // Update UI with extracted content
@@ -346,36 +372,85 @@ public final class SlackMonitoringService: ObservableObject {
     
     // MARK: - Vector Database Integration
     
-    /// Ingest Slack conversation into vector database
+    /// Ingest Slack conversation into database
     private func ingestConversationToVectorStore(_ conversation: SlackConversation) async {
         do {
-            // Track ingestion session for continuity
-            let sessionId = UUID().uuidString
-            // Create a summary of the conversation for vector storage
-            let conversationText = conversation.messages.map { message in
-                "[\(message.sender)] \(message.content)"
-            }.joined(separator: "\n")
+            // Get the Slack database directly
+            let rawDatabase = vectorService.getDatabase()
+            logToFile("   🔍 Database type: \(type(of: rawDatabase))")
             
-            let title = "Slack Conversation: \(conversation.channel)"
-            let summary = generateConversationSummary(conversation)
-            let sender = conversation.workspace
+            guard let database = rawDatabase as? SlackDatabaseSchema else {
+                logToFile("   ❌ No database available for ingestion or not SlackDatabaseSchema type")
+                logToFile("   ❌ Actual type: \(String(describing: rawDatabase))")
+                return
+            }
             
-            print("   🔧 Ingesting conversation to vector database...")
-            print("      Title: \(title)")
-            print("      Content length: \(conversationText.count) characters")
-            print("      Messages: \(conversation.messages.count)")
+            logToFile("   🔧 Ingesting \(conversation.messages.count) messages to Slack database...")
+            logToFile("   📊 Database URL: \(database.databaseURL)")
             
-            let result = try await vectorService.ingest(
-                content: conversationText,
-                title: title,
-                summary: summary,
-                sender: sender
-            )
+            // Check if database is actually initialized
+            if !database.isDatabaseOpen() {
+                logToFile("   ❌ Database connection is not open - reinitializing...")
+                try await database.initializeDatabase()
+                logToFile("   ✅ Database reinitialized")
+            }
             
-            print("   ✅ Successfully ingested to vector database!")
-            print("      ID: \(result.summaryId)")
-            print("      Keywords: \(result.extractedKeywords.joined(separator: ", "))")
-            print("      Processing time: \(String(format: "%.2f", result.processingTime))s")
+            var successCount = 0
+            var duplicateCount = 0
+            var errorCount = 0
+            
+            // Ingest each message individually for proper deduplication
+            for message in conversation.messages {
+                do {
+                    // Create message metadata with reactions and mentions
+                    let metadata = SlackMessage.MessageMetadata(
+                        editedAt: nil, // ExtractedMessage doesn't have edited timestamp
+                        reactions: [:], // ExtractedMessage reactions structure is different
+                        mentions: [], // ExtractedMessage mentions structure is different
+                        attachmentNames: [], // ExtractedMessage attachments structure is different
+                        contentHash: nil, // Will be generated automatically
+                        version: 1
+                    )
+                    
+                    // Create SlackMessage using the correct constructor
+                    let slackMessage = SlackMessage(
+                        timestamp: message.timestamp,
+                        sender: message.sender,
+                        content: message.content,
+                        channel: conversation.channel,
+                        threadId: message.threadId,
+                        messageType: message.messageType,
+                        metadata: metadata
+                    )
+                    
+                    // Use processMessage method instead of insertMessage
+                    let result = try await database.processMessage(
+                        slackMessage,
+                        workspace: conversation.workspace,
+                        channel: conversation.channel
+                    )
+                    
+                    switch result {
+                    case .new(let messageId):
+                        successCount += 1
+                        logToFile("      ✅ New message: \(messageId)")
+                    case .duplicate:
+                        duplicateCount += 1
+                    case .updated(let messageId):
+                        successCount += 1
+                        logToFile("      📝 Updated existing message: \(messageId)")
+                    case .reactionsUpdated(let messageId):
+                        logToFile("      🙂 Updated reactions: \(messageId)")
+                    }
+                    
+                } catch {
+                    errorCount += 1
+                    logToFile("      ⚠️ Failed to process message: \(error)")
+                }
+            }
+            
+            logToFile("   ✅ Database ingestion complete!")
+            logToFile("      📊 New: \(successCount), Duplicates: \(duplicateCount), Errors: \(errorCount)")
             
             // Log ingestion checkpoint for resume capability
             UserDefaults.standard.set(Date(), forKey: "SlunkLastIngestionTime")
@@ -383,8 +458,8 @@ public final class SlackMonitoringService: ObservableObject {
             UserDefaults.standard.set(conversation.channel, forKey: "SlunkLastIngestionChannel")
             
         } catch {
-            print("   ❌ Vector database ingestion failed: \(error.localizedDescription)")
-            print("      Error details: \(error)")
+            logToFile("   ❌ Database ingestion failed: \(error.localizedDescription)")
+            logToFile("      Error details: \(error)")
         }
     }
     

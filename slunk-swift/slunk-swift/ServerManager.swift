@@ -23,14 +23,11 @@ class ServerManager: ObservableObject {
                 let productionService = await ProductionService.shared
                 try await productionService.initialize()
                 
-                // Get the database from the production service
+                // Database initialized (SlackDatabaseSchema for Slack monitoring)
                 if let database = await productionService.getDatabase() {
                     await MainActor.run {
-                        addLog("✅ Vector database initialized")
-                    }
-                    mcpServer?.setDatabase(database)
-                    await MainActor.run {
-                        addLog("✅ Vector database connected to MCP server")
+                        addLog("✅ Slack database initialized")
+                        addLog("✅ MCP tools use SlackQueryService directly")
                     }
                 } else {
                     await MainActor.run {

@@ -14,9 +14,30 @@ import Foundation
 /// - Actor-based thread safety for concurrent operations
 public actor SlackQueryService {
     private let messageContextualizer: MessageContextualizer
+    private var database: SlackDatabaseSchema?
     
     public init(messageContextualizer: MessageContextualizer) {
         self.messageContextualizer = messageContextualizer
+    }
+    
+    public func setDatabase(_ database: SlackDatabaseSchema) {
+        self.database = database
+    }
+    
+    // MARK: - Database Statistics
+    
+    public func getMessageCount() async throws -> Int {
+        guard let database = database else {
+            throw SlunkError.databaseInitializationFailed("Database not set in SlackQueryService")
+        }
+        return try await database.getMessageCount()
+    }
+    
+    public func getWorkspaceCount() async throws -> Int {
+        guard let database = database else {
+            throw SlunkError.databaseInitializationFailed("Database not set in SlackQueryService")
+        }
+        return try await database.getWorkspaceCount()
     }
     
     // MARK: - Basic Query Filters

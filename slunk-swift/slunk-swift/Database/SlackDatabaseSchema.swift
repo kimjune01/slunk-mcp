@@ -6,7 +6,7 @@ import SQLiteVec
 
 /// Database schema manager for Slack message storage with deduplication and vector search
 /// Integrates GRDB for relational data and SQLiteVec for semantic search capabilities
-class SlackDatabaseSchema {
+public class SlackDatabaseSchema {
     let databaseURL: URL
     var database: DatabaseQueue?
     
@@ -49,6 +49,12 @@ class SlackDatabaseSchema {
     static func getPersistentDatabaseURL() throws -> URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let appDir = appSupport.appendingPathComponent("Slunk")
+        
+        // Create directory if it doesn't exist
+        if !FileManager.default.fileExists(atPath: appDir.path) {
+            try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true, attributes: nil)
+        }
+        
         return appDir.appendingPathComponent("slack_store.db")
     }
     
@@ -409,6 +415,42 @@ class SlackDatabaseSchema {
             return []
         }
         return array
+    }
+    
+    // MARK: - Database Statistics
+    
+    public func getMessageCount() async throws -> Int {
+        guard let db = database else {
+            throw SlackDatabaseError.databaseNotOpen
+        }
+        
+        return try await db.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM slack_messages") ?? 0
+        }
+    }
+    
+    public func getWorkspaceCount() async throws -> Int {
+        guard let db = database else {
+            throw SlackDatabaseError.databaseNotOpen
+        }
+        
+        return try await db.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT workspace) FROM slack_messages") ?? 0
+        }
+    }
+    
+    public func isDatabaseOpen() -> Bool {
+        return database != nil
+    }
+    
+    func getDatabaseSize() async throws -> Int64 {
+        guard let db = database else {
+            throw SlackDatabaseError.databaseNotOpen
+        }
+        
+        return try await db.read { db in
+            try Int64.fetchOne(db, sql: "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()") ?? 0
+        }
     }
 }
 
