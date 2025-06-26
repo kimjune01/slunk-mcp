@@ -49,18 +49,28 @@ public final class SlackMonitoringService: ObservableObject {
         
         if let data = logMessage.data(using: .utf8) {
             if FileManager.default.fileExists(atPath: logFileURL.path) {
-                if let fileHandle = try? FileHandle(forWritingTo: logFileURL) {
+                // Use defer to ensure FileHandle is always closed
+                do {
+                    let fileHandle = try FileHandle(forWritingTo: logFileURL)
+                    defer { 
+                        try? fileHandle.close()
+                    }
                     fileHandle.seekToEndOfFile()
                     fileHandle.write(data)
-                    fileHandle.closeFile()
+                } catch {
+                    Logger.shared.logError(error, context: "SlackMonitoringService.logToFile")
                 }
             } else {
-                try? data.write(to: logFileURL)
+                do {
+                    try data.write(to: logFileURL)
+                } catch {
+                    Logger.shared.logError(error, context: "SlackMonitoringService.logToFile.write")
+                }
             }
         }
         
-        // Also print to console
-        debugPrint(message)
+        // Use structured logging instead of debugPrint
+        Logger.shared.logInfo(message)
     }
     
     // MARK: - Public API
@@ -82,8 +92,8 @@ public final class SlackMonitoringService: ObservableObject {
         currentRetryCount = 0
         loadMonitoringState()
         
-        monitoringTask = Task {
-            await monitorLoop()
+        monitoringTask = Task { [weak self] in
+            await self?.monitorLoop()
         }
     }
     
@@ -101,8 +111,11 @@ public final class SlackMonitoringService: ObservableObject {
         cleanupService.stopPeriodicCleanup()
         logToFile("✅ Database cleanup service stopped")
         
-        monitoringTask?.cancel()
-        monitoringTask = nil
+        // Properly cancel and clean up the monitoring task
+        if let task = monitoringTask {
+            task.cancel()
+            monitoringTask = nil
+        }
         currentRetryCount = 0
     }
     
@@ -283,8 +296,8 @@ public final class SlackMonitoringService: ObservableObject {
         logToFile("   🎯 UI UPDATE: Sending \(conversation.messages.count) messages to UI")
         saveMonitoringState()
         
-        // Keep only last N extractions
-        if extractionHistory.count > config.maxExtractionHistory {
+        // Keep only last N extractions to prevent unbounded growth
+        while extractionHistory.count > config.maxExtractionHistory {
             extractionHistory.removeFirst()
         }
     }
@@ -414,7 +427,7 @@ public actor SlackAppObserver {
         for app in runningApps {
             if let appName = app.localizedName,
                appName.lowercased().contains("slack") {
-                debugPrint("✅ Found Slack app by name: \(appName), PID: \(app.processIdentifier)")
+                Logger.shared.logInfo("✅ Found Slack app by name: \(appName), PID: \(app.processIdentifier)")
                 return AppState(runningApplication: app)
             }
         }

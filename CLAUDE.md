@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Slunk is a Swift/SwiftUI macOS application that monitors Slack in real-time and provides intelligent search capabilities through an MCP (Model Context Protocol) server. It stores messages locally with SQLite and offers 9 comprehensive search tools with advanced deduplication.
+Slunk is a Swift/SwiftUI macOS application that monitors Slack in real-time and provides intelligent search capabilities through an MCP (Model Context Protocol) server. It stores messages locally with SQLite and offers 8 comprehensive search tools with advanced deduplication.
 
 ## Development Commands
 

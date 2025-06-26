@@ -140,6 +140,13 @@ class Logger {
         os_log("%{public}@", log: mcpLog, type: success ? .info : .error, message)
         fileLogger?.log(message, category: "MCP", type: success ? .info : .error)
     }
+    
+    // MARK: - General Logging
+    
+    func logInfo(_ message: String) {
+        os_log("%{public}@", log: OSLog.default, type: .info, message)
+        fileLogger?.log(message, category: "General", type: .info)
+    }
 }
 
 // MARK: - File Logger
@@ -181,9 +188,11 @@ private class FileLogger {
         do {
             if FileManager.default.fileExists(atPath: logFile.path) {
                 let handle = try FileHandle(forWritingTo: logFile)
+                defer { 
+                    try? handle.close()
+                }
                 handle.seekToEndOfFile()
                 handle.write(data)
-                handle.closeFile()
                 
                 // Check if rotation needed
                 rotateLogsIfNeeded()
