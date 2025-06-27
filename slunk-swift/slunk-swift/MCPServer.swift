@@ -438,6 +438,9 @@ class MCPServer {
                 version: Constants.compiledVersion
             )
             
+        case "backfill_embeddings":
+            return await handleBackfillEmbeddings(arguments, id: request.id)
+            
         default:
             return JSONRPCResponse(
                 result: nil,
@@ -1428,6 +1431,64 @@ class MCPServer {
     }
     
     // Helper functions for deleted types removed during consolidation
+    
+    // MARK: - Temporary Backfill Handler
+    
+    internal func handleBackfillEmbeddings(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
+        let batchSize = arguments["batch_size"] as? Int ?? 50
+        
+        // Get database from ProductionService
+        let database = await MainActor.run {
+            ProductionService.shared.getDatabase()
+        }
+        
+        guard let database = database else {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Database not available"),
+                id: id,
+                version: Constants.compiledVersion
+            )
+        }
+        
+        do {
+            logError("🔄 Starting embedding backfill...")
+            
+            // Run backfill
+            let (processed, failed) = try await database.backfillEmbeddings(batchSize: batchSize)
+            
+            logError("✅ Backfill complete: \(processed) processed, \(failed) failed")
+            
+            // Get final counts
+            let messageCount = try await database.getMessageCount()
+            
+            let resultText = """
+            Embedding Backfill Complete!
+            
+            Processed: \(processed) messages
+            Failed: \(failed) messages
+            
+            Total messages in database: \(messageCount)
+            
+            Embeddings have been generated for existing messages.
+            Semantic search should now work properly.
+            """
+            
+            let toolResponse: [String: Any] = [
+                "content": [
+                    ["type": "text", "text": resultText]
+                ]
+            ]
+            
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id, version: Constants.compiledVersion)
+            
+        } catch {
+            return JSONRPCResponse(
+                result: nil,
+                error: JSONRPCError(code: -32603, message: "Backfill failed: \(error.localizedDescription)"),
+                id: id, version: Constants.compiledVersion)
+        }
+    }
     
 }
 
