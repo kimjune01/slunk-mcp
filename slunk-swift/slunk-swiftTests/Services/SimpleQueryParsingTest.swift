@@ -33,7 +33,7 @@ final class SimpleQueryParsingTest: XCTestCase {
             range: NSRange(location: 0, length: queryWithChannel.utf16.count)
         )
         
-        let channels = matches.compactMap { match in
+        let channels: [String] = matches.compactMap { match in
             guard let range = Range(match.range(at: 1), in: queryWithChannel) else { return nil }
             return String(queryWithChannel[range])
         }
@@ -51,7 +51,7 @@ final class SimpleQueryParsingTest: XCTestCase {
             range: NSRange(location: 0, length: queryWithUser.utf16.count)
         )
         
-        let users = matches.compactMap { match in
+        let users: [String] = matches.compactMap { match in
             guard let range = Range(match.range(at: 1), in: queryWithUser) else { return nil }
             return String(queryWithUser[range])
         }

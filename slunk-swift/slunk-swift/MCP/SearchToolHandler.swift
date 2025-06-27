@@ -54,8 +54,8 @@ class SearchToolHandler: BaseMCPToolHandler {
         let limit = extractIntParameter("limit", from: arguments, defaultValue: 10) ?? 10
         
         do {
-            // Use direct database search for now (basic keyword search)
-            let results = try await database.searchMessages(
+            // Use hybrid search for better semantic matching
+            let results = try await database.hybridSearchWithQuery(
                 query: query,
                 limit: limit
             )

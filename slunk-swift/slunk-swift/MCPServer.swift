@@ -10,6 +10,15 @@ class MCPServer {
         static let readLoopSleepNanoseconds: UInt64 = 10_000_000 // 10ms
         static let retryLoopSleepNanoseconds: UInt64 = 100_000_000 // 100ms
         static let shutdownDelayNanoseconds: UInt64 = 100_000_000 // 100ms
+        
+        // Compile-time version: seconds since June 1, 2025
+        static let compiledVersion: Int = {
+            // June 1, 2025 00:00:00 UTC
+            let june1_2025 = Date(timeIntervalSince1970: 1748736000) // Unix timestamp for June 1, 2025
+            let compileTime = Date() // Current time when compiled
+            let secondsSinceJune1 = Int(compileTime.timeIntervalSince(june1_2025))
+            return secondsSinceJune1
+        }()
     }
     
     // MARK: - Properties
@@ -87,7 +96,8 @@ class MCPServer {
             let errorResponse = JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32700, message: "Parse error: \(error.localizedDescription)"),
-                id: .number(0)
+                id: .number(0),
+                version: Constants.compiledVersion
             )
             try? sendResponse(errorResponse)
         }
@@ -169,7 +179,8 @@ class MCPServer {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32601, message: "Method not found", data: nil),
-                id: request.id
+                id: request.id,
+                version: Constants.compiledVersion
             )
         }
     }
@@ -186,12 +197,12 @@ class MCPServer {
             ]
         ]
         
-        return JSONRPCResponse(result: result, error: nil, id: request.id)
+        return JSONRPCResponse(result: result, error: nil, id: request.id, version: Constants.compiledVersion)
     }
     
     private func handleInitialized(_ request: JSONRPCRequest) -> JSONRPCResponse {
         // Notification, no response needed
-        return JSONRPCResponse(result: nil, error: nil, id: request.id)
+        return JSONRPCResponse(result: nil, error: nil, id: request.id, version: Constants.compiledVersion)
     }
     
     private func handleToolsList(_ request: JSONRPCRequest) -> JSONRPCResponse {
@@ -371,7 +382,7 @@ class MCPServer {
         3. searchConversations → Key decisions
         """
         
-        return JSONRPCResponse(result: ["tools": tools], error: nil, id: request.id)
+        return JSONRPCResponse(result: ["tools": tools], error: nil, id: request.id, version: Constants.compiledVersion)
     }
     
     private func handleToolCall(_ request: JSONRPCRequest) async -> JSONRPCResponse {
@@ -384,7 +395,8 @@ class MCPServer {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32602, message: "Invalid params"),
-                id: request.id
+                id: request.id,
+                version: Constants.compiledVersion
             )
         }
         
@@ -422,14 +434,16 @@ class MCPServer {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32601, message: "Conversational search feature temporarily disabled - use searchConversations instead"),
-                id: request.id
+                id: request.id,
+                version: Constants.compiledVersion
             )
             
         default:
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32601, message: "Unknown tool: '\(name)'. Available tools: searchConversations, search_messages, get_thread_context, get_message_context, parse_natural_query, discover_patterns, suggest_related, conversational_search. Use 'tools/list' to see full descriptions and parameters."),
-                id: request.id
+                id: request.id,
+                version: Constants.compiledVersion
             )
         }
     }
@@ -439,7 +453,7 @@ class MCPServer {
             try await Task.sleep(nanoseconds: Constants.shutdownDelayNanoseconds)
             stop()
         }
-        return JSONRPCResponse(result: nil, error: nil, id: request.id)
+        return JSONRPCResponse(result: nil, error: nil, id: request.id, version: Constants.compiledVersion)
     }
     
     private func sendResponse(_ response: JSONRPCResponse) throws {
@@ -490,7 +504,8 @@ class MCPServer {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32602, message: "Missing required parameter 'query'"),
-                id: id
+                id: id,
+                version: Constants.compiledVersion
             )
         }
         
@@ -511,14 +526,14 @@ class MCPServer {
                     ["type": "text", "text": emptyResponse]
                 ]
             ]
-            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id, version: Constants.compiledVersion)
         }
         
         do {
             logError("🔍 Starting search...")
             
-            // Use simple search instead of hybrid search for now
-            let results = try await database.searchMessages(query: query, limit: limit)
+            // Use hybrid search for better semantic matching
+            let results = try await database.hybridSearchWithQuery(query: query, limit: limit)
             logError("🔍 Search returned \(results.count) results")
             
             // Format results for MCP tool response
@@ -541,8 +556,8 @@ class MCPServer {
             return JSONRPCResponse(
                 result: toolResponse,
                 error: nil,
-                id: id
-            )
+                id: id,
+                version: Constants.compiledVersion)
             
         } catch {
             logError("❌ Search error: \(error)")
@@ -552,7 +567,7 @@ class MCPServer {
                     ["type": "text", "text": errorResponse]
                 ]
             ]
-            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id, version: Constants.compiledVersion)
         }
     }
     
@@ -593,7 +608,8 @@ class MCPServer {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32602, message: "Missing required parameter 'query'. For search_messages, provide: {\"query\": \"your search terms\", \"channels\": [\"#channel1\"], \"users\": [\"@username\"], \"start_date\": \"2024-03-15\"}. Use this tool when you need specific filtering by channel, user, or date."),
-                id: id
+                id: id,
+                version: Constants.compiledVersion
             )
         }
         
@@ -614,8 +630,7 @@ class MCPServer {
                 return JSONRPCResponse(
                     result: nil,
                     error: JSONRPCError(code: -32602, message: "Invalid 'start_date' format '\(startDateStr)'. Use ISO 8601 format with time like '2024-03-15T00:00:00Z' or '2024-03-15T14:30:00Z'."),
-                    id: id
-                )
+                    id: id, version: Constants.compiledVersion)
             }
         }
         
@@ -625,8 +640,7 @@ class MCPServer {
                 return JSONRPCResponse(
                     result: nil,
                     error: JSONRPCError(code: -32602, message: "Invalid 'end_date' format '\(endDateStr)'. Use ISO 8601 format with time like '2024-03-20T23:59:59Z' or '2024-03-20T18:00:00Z'."),
-                    id: id
-                )
+                    id: id, version: Constants.compiledVersion)
             }
         }
         
@@ -638,8 +652,7 @@ class MCPServer {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32602, message: "Invalid 'search_mode' '\(searchModeStr)'. Valid options are: 'semantic' (finds similar meaning), 'structured' (exact keyword matching), 'hybrid' (combines both, recommended)."),
-                id: id
-            )
+                id: id, version: Constants.compiledVersion)
         }
         
         // Validate limit
@@ -647,12 +660,11 @@ class MCPServer {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32602, message: "Invalid 'limit' \(limit). Must be between 1 and 100. Use smaller values (5-20) for focused results, larger values (50-100) for comprehensive searches."),
-                id: id
-            )
+                id: id, version: Constants.compiledVersion)
         }
         
-        // Parse search mode (for future use)
-        let _ = {
+        // Parse search mode
+        let searchMode = {
             switch searchModeStr {
             case "semantic": return SearchMode.semantic
             case "structured": return SearchMode.structured
@@ -692,16 +704,58 @@ class MCPServer {
             )
         }
         
-        // Perform database search
+        // Perform database search based on search mode
         do {
-            let results = try await database.searchMessages(
-                query: query,
-                channels: channels.isEmpty ? nil : channels,
-                users: users.isEmpty ? nil : users,
-                startDate: startDate,
-                endDate: endDate,
-                limit: limit
-            )
+            let results: [SlackDatabaseSchema.SlackMessageWithWorkspace]
+            
+            switch searchMode {
+            case .semantic:
+                // For semantic-only search, we'll use hybrid search
+                // The implementation will generate embeddings from the query
+                if !query.isEmpty {
+                    results = try await database.hybridSearchWithQuery(
+                        query: query,
+                        channels: channels.isEmpty ? nil : channels,
+                        users: users.isEmpty ? nil : users,
+                        limit: limit
+                    )
+                } else {
+                    // Can't do semantic search without a query
+                    results = []
+                }
+                
+            case .structured:
+                // Use traditional keyword search
+                results = try await database.searchMessages(
+                    query: query,
+                    channels: channels.isEmpty ? nil : channels,
+                    users: users.isEmpty ? nil : users,
+                    startDate: startDate,
+                    endDate: endDate,
+                    limit: limit
+                )
+                
+            case .hybrid:
+                // Use hybrid search that combines both approaches
+                if !query.isEmpty {
+                    results = try await database.hybridSearchWithQuery(
+                        query: query,
+                        channels: channels.isEmpty ? nil : channels,
+                        users: users.isEmpty ? nil : users,
+                        limit: limit
+                    )
+                } else {
+                    // Fall back to structured search when no query
+                    results = try await database.searchMessages(
+                        query: query,
+                        channels: channels.isEmpty ? nil : channels,
+                        users: users.isEmpty ? nil : users,
+                        startDate: startDate,
+                        endDate: endDate,
+                        limit: limit
+                    )
+                }
+            }
             
             // Format results
             let formattedResults = results.map { result in
@@ -734,13 +788,12 @@ class MCPServer {
                 ]
             ]
             
-            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id, version: Constants.compiledVersion)
         } catch {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Search failed: \(error.localizedDescription). Try simplifying your query or check if the database is accessible."),
-                id: id
-            )
+                id: id, version: Constants.compiledVersion)
         }
     }
     
@@ -774,8 +827,7 @@ class MCPServer {
                 return JSONRPCResponse(
                     result: nil,
                     error: JSONRPCError(code: -32602, message: "Thread not found with id: \(threadId)"),
-                    id: id
-                )
+                    id: id, version: Constants.compiledVersion)
             }
             
             // Sort messages by timestamp
@@ -908,14 +960,13 @@ class MCPServer {
                 ]
             ]
             
-            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id, version: Constants.compiledVersion)
             
         } catch {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Failed to extract thread context: \(error.localizedDescription)"),
-                id: id
-            )
+                id: id, version: Constants.compiledVersion)
         }
     }
     
@@ -947,8 +998,7 @@ class MCPServer {
                 return JSONRPCResponse(
                     result: nil,
                     error: JSONRPCError(code: -32602, message: "Message not found with id: \(messageId)"),
-                    id: id
-                )
+                    id: id, version: Constants.compiledVersion)
             }
             
             let message = messageWithWorkspace.message
@@ -1055,14 +1105,13 @@ class MCPServer {
                 ]
             ]
             
-            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id, version: Constants.compiledVersion)
             
         } catch {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Failed to extract message context: \(error.localizedDescription)"),
-                id: id
-            )
+                id: id, version: Constants.compiledVersion)
         }
     }
     
@@ -1121,7 +1170,7 @@ class MCPServer {
             ]
         ]
         
-        return JSONRPCResponse(result: toolResponse, error: nil, id: id)
+        return JSONRPCResponse(result: toolResponse, error: nil, id: id, version: Constants.compiledVersion)
     }
     
     internal func handleDiscoverPatterns(_ arguments: [String: Any], id: JSONRPCId) async -> JSONRPCResponse {
@@ -1204,14 +1253,13 @@ class MCPServer {
                 ]
             ]
             
-            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id, version: Constants.compiledVersion)
             
         } catch {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Pattern discovery failed: \(error.localizedDescription)"),
-                id: id
-            )
+                id: id, version: Constants.compiledVersion)
         }
     }
     
@@ -1230,8 +1278,7 @@ class MCPServer {
                     message: "Must provide either 'reference_messages' or 'query_context' parameter.",
                     suggestions: ["Add query_context: 'topic'", "Add reference_messages: ['id1']"]
                 ),
-                id: id
-            )
+                id: id, version: Constants.compiledVersion)
         }
         
         // Check if database is available
@@ -1246,10 +1293,10 @@ class MCPServer {
         do {
             var suggestions: [[String: Any]] = []
             
-            // If we have query context, use it to find related content
+            // If we have query context, use semantic search to find related content
             if let context = queryContext {
-                // TODO: Implement proper query parsing when available
-                let searchResults = try await database.searchMessages(query: context, limit: limit)
+                // Use hybrid search for better semantic matching
+                let searchResults = try await database.hybridSearchWithQuery(query: context, limit: limit)
                 
                 suggestions = searchResults.map { result in
                     [
@@ -1292,14 +1339,13 @@ class MCPServer {
                 ]
             ]
             
-            return JSONRPCResponse(result: toolResponse, error: nil, id: id)
+            return JSONRPCResponse(result: toolResponse, error: nil, id: id, version: Constants.compiledVersion)
             
         } catch {
             return JSONRPCResponse(
                 result: nil,
                 error: JSONRPCError(code: -32603, message: "Related suggestions failed: \(error.localizedDescription)"),
-                id: id
-            )
+                id: id, version: Constants.compiledVersion)
         }
     }
     

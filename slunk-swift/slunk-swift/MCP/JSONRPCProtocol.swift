@@ -36,15 +36,17 @@ struct JSONRPCResponse: Codable {
     let result: AnyCodable?
     let error: JSONRPCError?
     let id: JSONRPCId
+    let version: Int?
     
-    init(result: Any? = nil, error: JSONRPCError? = nil, id: JSONRPCId) {
+    init(result: Any? = nil, error: JSONRPCError? = nil, id: JSONRPCId, version: Int? = nil) {
         self.result = result.map { AnyCodable($0) }
         self.error = error
         self.id = id
+        self.version = version
     }
     
     enum CodingKeys: String, CodingKey {
-        case jsonrpc, result, error, id
+        case jsonrpc, result, error, id, version
     }
     
     init(from decoder: Decoder) throws {
@@ -53,6 +55,7 @@ struct JSONRPCResponse: Codable {
         result = try container.decodeIfPresent(AnyCodable.self, forKey: .result)
         error = try container.decodeIfPresent(JSONRPCError.self, forKey: .error)
         id = try container.decode(JSONRPCId.self, forKey: .id)
+        version = try container.decodeIfPresent(Int.self, forKey: .version)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -61,6 +64,7 @@ struct JSONRPCResponse: Codable {
         try container.encodeIfPresent(result, forKey: .result)
         try container.encodeIfPresent(error, forKey: .error)
         try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(version, forKey: .version)
     }
 }
 

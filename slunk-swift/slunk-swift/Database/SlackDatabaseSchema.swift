@@ -11,11 +11,13 @@ public class SlackDatabaseSchema {
     let databaseURL: URL
     var database: DatabaseQueue?
     private let databaseConfig: GRDB.Configuration
+    private let embeddingService: EmbeddingService
     
     // MARK: - Initialization
     
     init(databaseURL: URL) {
         self.databaseURL = databaseURL
+        self.embeddingService = EmbeddingService()
         
         // Configure database for concurrent access
         var config = GRDB.Configuration()
@@ -702,22 +704,8 @@ public class SlackDatabaseSchema {
     
     /// Generate vector embedding for text using NLEmbedding
     private func generateEmbedding(for text: String) async throws -> [Float] {
-        // For now, create a simple hash-based embedding as a placeholder
-        // TODO: Implement proper NLEmbedding when API is stable
-        let hash = text.hash
-        var embedding = Array(repeating: Float(0.0), count: 512)
-        
-        // Use hash to create a deterministic but varied embedding
-        let hashBytes = withUnsafeBytes(of: hash) { Data($0) }
-        for i in 0..<min(hashBytes.count, embedding.count) {
-            embedding[i] = Float(hashBytes[i]) / 255.0
-        }
-        
-        // Add some text-based features
-        embedding[0] = Float(text.count) / 1000.0 // Normalized length
-        embedding[1] = Float(text.split(separator: " ").count) / 100.0 // Word count
-        
-        return embedding
+        // Use the proper EmbeddingService that uses Apple's NLEmbedding
+        return try await embeddingService.generateEmbedding(for: text)
     }
     
     /// Store a vector embedding for a message
@@ -907,6 +895,62 @@ public class SlackDatabaseSchema {
         guard magnitudeA > 0 && magnitudeB > 0 else { return 0.0 }
         
         return dotProduct / (magnitudeA * magnitudeB)
+    }
+    
+    // MARK: - Embedding Backfill
+    
+    /// Backfill embeddings for messages that don't have them
+    public func backfillEmbeddings(batchSize: Int = 100) async throws -> (processed: Int, failed: Int) {
+        guard let database = database else {
+            throw SlackDatabaseError.databaseNotOpen
+        }
+        
+        var processedCount = 0
+        var failedCount = 0
+        
+        // Query to find messages without embeddings
+        let sql = """
+            SELECT sm.id, sm.content 
+            FROM slack_messages sm
+            LEFT JOIN slack_message_embeddings sme ON sm.id = sme.message_id
+            WHERE sme.message_id IS NULL 
+            AND sm.content IS NOT NULL 
+            AND sm.content != ''
+            LIMIT ?
+        """
+        
+        while true {
+            let messages = try await database.read { db in
+                return try Row.fetchAll(db, sql: sql, arguments: [batchSize])
+            }
+            
+            if messages.isEmpty {
+                break
+            }
+            
+            for row in messages {
+                guard let messageId = row["id"] as? String,
+                      let content = row["content"] as? String else {
+                    continue
+                }
+                
+                do {
+                    let embedding = try await generateEmbedding(for: content)
+                    try await insertEmbedding(messageId: messageId, embedding: embedding)
+                    processedCount += 1
+                    
+                    if processedCount % 10 == 0 {
+                        Logger.shared.logDatabaseOperation("Backfilled embeddings for \(processedCount) messages")
+                    }
+                } catch {
+                    Logger.shared.logDatabaseOperation("Failed to generate embedding for message \(messageId): \(error)")
+                    failedCount += 1
+                }
+            }
+        }
+        
+        Logger.shared.logDatabaseOperation("Embedding backfill complete: \(processedCount) processed, \(failedCount) failed")
+        return (processed: processedCount, failed: failedCount)
     }
 }
 
