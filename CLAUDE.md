@@ -125,14 +125,14 @@ slack_message_embeddings (
 ## Testing MCP Integration
 
 ```bash
-# Test MCP server
-echo '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}' | /path/to/slunk-swift
+# Test MCP server (adjust path based on your build location)
+echo '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}' | /Users/junekim/Library/Developer/Xcode/DerivedData/slunk-swift-*/Build/Products/Debug/slunk-swift.app/Contents/MacOS/slunk-swift --mcp
 
 # List available tools
-echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}' | /path/to/slunk-swift
+echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}' | /Users/junekim/Library/Developer/Xcode/DerivedData/slunk-swift-*/Build/Products/Debug/slunk-swift.app/Contents/MacOS/slunk-swift --mcp
 
 # Search messages
-echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"searchConversations","arguments":{"query":"API discussion"}},"id":3}' | /path/to/slunk-swift
+echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"searchConversations","arguments":{"query":"API discussion"}},"id":3}' | /Users/junekim/Library/Developer/Xcode/DerivedData/slunk-swift-*/Build/Products/Debug/slunk-swift.app/Contents/MacOS/slunk-swift --mcp
 ```
 
 ## Common Issues
@@ -164,3 +164,10 @@ echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"searchConversatio
 - Polling intervals: 5s (active), 10s (background), 30s (inactive)
 - Reduced CPU usage while maintaining responsiveness
 - Better database query performance with proper indexing
+
+### Semantic Search Implementation (June 27, 2025)
+- Replaced placeholder hash-based embeddings with Apple's NLEmbedding framework
+- True semantic search that finds conceptually similar messages
+- Automatic embedding generation for new messages
+- Backfill capability for existing messages without embeddings
+- Hybrid search mode combines semantic and keyword matching for best results

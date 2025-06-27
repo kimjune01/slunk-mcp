@@ -7,7 +7,7 @@ Slunk is a Swift-based macOS application that provides intelligent Slack search 
 - **🔍 Real-time Slack Monitoring** - Automatic message capture and database storage
 - **💾 Local SQLite Database** - Messages stored with deduplication and 2-month retention
 - **🤖 8 MCP Search Tools** - Natural language search, filtering, pattern discovery
-- **🧠 Semantic Search** - 512-dimensional vector embeddings for meaning-based search
+- **🧠 Semantic Search** - Apple's NLEmbedding with 512-dimensional vectors for true semantic matching
 - **📊 Conversation Analytics** - Pattern discovery and trend analysis
 - **🔒 Privacy-First** - All data stored locally on your machine
 - **⚡ High Performance** - Optimized for 100K+ messages
@@ -76,7 +76,7 @@ Both modes share the same SQLite database, so the GUI app populates data that th
 
 ## MCP Tools
 
-The 9 MCP tools provide comprehensive Slack search capabilities:
+The 8 MCP tools provide comprehensive Slack search capabilities:
 
 ### Basic Search
 - **`searchConversations`** - Natural language search across all messages
