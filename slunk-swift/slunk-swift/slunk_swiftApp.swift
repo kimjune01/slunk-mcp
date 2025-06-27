@@ -5,17 +5,15 @@ import AppKit
 struct slunk_swiftApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    static func main() {
-        // Check if we should run as MCP server
+    init() {
+        // Check if we should run as MCP server BEFORE SwiftUI initializes
         let args = CommandLine.arguments
         let isMCPMode = args.contains("--mcp") || ProcessInfo.processInfo.environment["MCP_MODE"] != nil
         
         if isMCPMode {
-            // Run MCP server directly without SwiftUI
-            runMCPServer()
-        } else {
-            // Run normal SwiftUI app
-            slunk_swiftApp.main()
+            // Run MCP server and exit before SwiftUI starts
+            Self.runMCPServer()
+            exit(0)  // This will never return
         }
     }
     
