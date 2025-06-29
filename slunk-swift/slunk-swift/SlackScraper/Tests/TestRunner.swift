@@ -106,13 +106,13 @@ public struct TestRunner {
     private static func runPhase2Tests() async -> [String] {
         var results: [String] = []
         
-        // Test 1: DeadlineManager (skipped - using LBAccessibility framework)
-        results.append("\n⏰ DeadlineManager tests skipped (using LBAccessibility framework)")
-        logger.info("⏰ DeadlineManager tests skipped (using LBAccessibility framework)")
+        // Test 1: DeadlineManager (skipped - using JKAccessibility framework)
+        results.append("\n⏰ DeadlineManager tests skipped (using JKAccessibility framework)")
+        logger.info("⏰ DeadlineManager tests skipped (using JKAccessibility framework)")
         
-        // Test 2: ElementMatchers (skipped - using LBAccessibility framework)
-        results.append("\n🏷️ ElementMatchers tests skipped (using LBAccessibility framework)")
-        logger.info("🏷️ ElementMatchers tests skipped (using LBAccessibility framework)")
+        // Test 2: ElementMatchers (skipped - using JKAccessibility framework)
+        results.append("\n🏷️ ElementMatchers tests skipped (using JKAccessibility framework)")
+        logger.info("🏷️ ElementMatchers tests skipped (using JKAccessibility framework)")
         
         // Test 3: AccessibilityCore
         results.append("\n🎯 Testing AccessibilityCore...")

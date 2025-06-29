@@ -251,9 +251,9 @@ public final class SlackMonitoringService: ObservableObject {
     
     private func extractContent(from slackState: AppState) async {
         do {
-            logToFile("   🔍 Creating LBAccessibility element for PID: \(slackState.pid)")
+            logToFile("   🔍 Creating JKAccessibility element for PID: \(slackState.pid)")
             let slackApplication = Element(processIdentifier: slackState.pid)
-            logToFile("   ✅ Created LBAccessibility element, attempting content extraction...")
+            logToFile("   ✅ Created JKAccessibility element, attempting content extraction...")
             
             if let conversation = try await slackParser.parseCurrentConversation(
                 from: slackApplication,

@@ -17,8 +17,8 @@ public struct SlackScraperTests {
         
         // Phase 2 Tests (New)
         print("\n=== Phase 2 Tests ===")
-        print("⏰ DeadlineManager tests skipped (using LBAccessibility framework)")
-        print("🏷️ ElementMatchers tests skipped (using LBAccessibility framework)")
+        print("⏰ DeadlineManager tests skipped (using JKAccessibility framework)")
+        print("🏷️ ElementMatchers tests skipped (using JKAccessibility framework)")
         allTestsPassed = await AccessibilityCoreTests.runAllTests() && allTestsPassed
         allTestsPassed = await SlackUIParserTests.runAllTests() && allTestsPassed
         

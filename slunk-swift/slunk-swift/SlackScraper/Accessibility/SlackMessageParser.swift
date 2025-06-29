@@ -8,7 +8,7 @@ actor SlackMessageParser {
     
     // MARK: - Message Parsing
     
-    /// Parse messages from content list using LBAccessibility
+    /// Parse messages from content list using JKAccessibility
     func parseMessagesFromContentList(_ contentList: Element) async throws -> [SlackMessage] {
         // Check if this is a thread sidebar for processing context
         let _ = (try? contentList.getAttributeValue(.description) as? String)?.contains("Thread") ?? false
@@ -191,9 +191,9 @@ actor SlackMessageParser {
         return finalMessage
     }
     
-    /// Extract text content from element using LBAccessibility tree traversal
+    /// Extract text content from element using JKAccessibility tree traversal
     func extractMessageContent(from element: Element) async throws -> String? {
-        // Use LBAccessibility tree value collection
+        // Use JKAccessibility tree value collection
         let content = try await element.collectTreeValues(
             matching: Matchers.hasRole(.staticText),
             maxDepth: 10,

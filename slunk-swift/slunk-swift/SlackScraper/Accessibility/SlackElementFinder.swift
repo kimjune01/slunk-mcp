@@ -8,7 +8,7 @@ actor SlackElementFinder {
     
     // MARK: - Find Web Area
     
-    /// Find webArea element using LBAccessibility matchers
+    /// Find webArea element using JKAccessibility matchers
     func findWebAreaElement(from applicationElement: Element) async throws -> Element? {
         debugPrint("🔍 SlackUIParser: Searching for webArea element...")
         
@@ -57,14 +57,14 @@ actor SlackElementFinder {
     
     // MARK: - Find Elements by Class
     
-    /// Find element with specific CSS class using LBAccessibility
+    /// Find element with specific CSS class using JKAccessibility
     func findElementWithClass(
         from element: Element, 
         className: String
     ) async throws -> Element? {
         debugPrint("🔍 SlackUIParser: Searching for element with class: \(className)")
         
-        // Use LBAccessibility class matcher
+        // Use JKAccessibility class matcher
         let classMatcher = Matchers.hasClass(className)
         
         return try await element.findElement(

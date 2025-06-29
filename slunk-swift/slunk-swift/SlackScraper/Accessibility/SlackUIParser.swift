@@ -1,9 +1,9 @@
 import Foundation
 import ApplicationServices
 
-// MARK: - Slack UI Parser using LBAccessibility Framework
+// MARK: - Slack UI Parser using JKAccessibility Framework
 
-/// Main parser for extracting Slack content from accessibility elements using the LBAccessibility framework
+/// Main parser for extracting Slack content from accessibility elements using the JKAccessibility framework
 public actor SlackUIParser {
     public static let shared = SlackUIParser()
     
@@ -28,7 +28,7 @@ public actor SlackUIParser {
         timeout: TimeInterval = parseTimeout
     ) async throws -> SlackConversation? {
         
-        debugPrint("🔍 SlackUIParser: Starting parseCurrentConversation using LBAccessibility")
+        debugPrint("🔍 SlackUIParser: Starting parseCurrentConversation using JKAccessibility")
         
         // Step 1: Find webArea element (Slack's main UI container)
         guard let webAreaElement = try await elementFinder.findWebAreaElement(from: applicationElement) else {
@@ -167,9 +167,9 @@ public actor SlackUIParser {
 // MARK: - Debug Extension
 
 public extension SlackUIParser {
-    /// Debug method to print element tree using LBAccessibility
+    /// Debug method to print element tree using JKAccessibility
     func debugElementTree(from element: Element, maxDepth: Int = 5) async {
-        debugPrint("🌳 SlackUIParser: Printing element tree with LBAccessibility...")
+        debugPrint("🌳 SlackUIParser: Printing element tree with JKAccessibility...")
         
         // Create a simple debug output instead of dumpSendable
         let role = try? element.getAttributeValue(.role) as? Role
