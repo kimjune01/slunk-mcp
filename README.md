@@ -37,17 +37,61 @@ slunk/
 - 8 comprehensive MCP tools for search and analysis
 - SwiftUI interface with database statistics
 
-## Quick Start
+## Build Instructions
 
-1. **Build the app:**
+### Prerequisites
+- macOS 13.0 or later
+- Xcode 15.0 or later
+- Command Line Tools installed (`xcode-select --install`)
+
+### Building from Command Line
+
+1. **Debug Build** (for development):
+   ```bash
+   cd slunk-swift
+   xcodebuild -project slunk-swift.xcodeproj -scheme slunk-swift -configuration Debug build
+   ```
+
+2. **Release Build** (optimized):
    ```bash
    cd slunk-swift
    xcodebuild -project slunk-swift.xcodeproj -scheme slunk-swift -configuration Release build
    ```
 
+3. **Clean Build** (if needed):
+   ```bash
+   xcodebuild -project slunk-swift.xcodeproj -scheme slunk-swift clean build
+   ```
+
+### Building from Xcode
+
+1. Open `slunk-swift/slunk-swift.xcodeproj` in Xcode
+2. Select the `slunk-swift` scheme
+3. Choose Debug or Release configuration from the scheme menu
+4. Press ⌘B to build or ⌘R to build and run
+
+### Build Output Location
+
+The built app will be located in:
+- **Debug**: `~/Library/Developer/Xcode/DerivedData/slunk-swift-*/Build/Products/Debug/slunk-swift.app`
+- **Release**: `~/Library/Developer/Xcode/DerivedData/slunk-swift-*/Build/Products/Release/slunk-swift.app`
+
+To find the exact path:
+```bash
+xcodebuild -project slunk-swift/slunk-swift.xcodeproj -showBuildSettings | grep BUILD_DIR
+```
+
+## Quick Start
+
+1. **Build the app** (see Build Instructions above)
+
 2. **Run the app (GUI Mode):**
    ```bash
-   open /path/to/slunk-swift.app
+   # Using the build output path from above
+   open ~/Library/Developer/Xcode/DerivedData/slunk-swift-*/Build/Products/Release/slunk-swift.app
+   
+   # Or if you've copied it to Applications
+   open /Applications/slunk-swift.app
    ```
    The app will appear in your menu bar with a # icon.
 
@@ -63,6 +107,7 @@ slunk/
      }
    }
    ```
+   Replace `/path/to/slunk-swift.app` with your actual build output path.
    Then restart Claude Desktop.
 
 ## Running Modes
