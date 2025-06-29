@@ -1,5 +1,4 @@
 import Foundation
-import Darwin
 
 class MCPServer {
     // MARK: - Constants

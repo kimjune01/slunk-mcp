@@ -33,4 +33,18 @@ ENV/
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Xcode build artifacts
+DerivedData/
+*.xcarchive
+*.ipa
+
+# Build directories
+releases/
+.build/
+*.app/
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved

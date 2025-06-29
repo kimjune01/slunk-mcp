@@ -119,6 +119,28 @@ The 8 MCP tools provide comprehensive Slack search capabilities:
 - Automatic cleanup of messages older than 2 months
 - Messages are deduplicated by content hash
 
+## Testing
+
+### Swift Tests
+```bash
+# Run all tests
+xcodebuild test -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift
+
+# Quick smoke test
+xcodebuild test -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift \
+  -only-testing:slunk-swiftTests/MCPIntegrationTests
+
+# Key attribution tests (prove semantic search works)
+xcodebuild test -project slunk-swift/slunk-swift.xcodeproj -scheme slunk-swift \
+  -only-testing:slunk-swiftTests/WorkingRoundTripTest \
+  -only-testing:slunk-swiftTests/SimpleSemanticDemo
+```
+
+### Test Coverage
+- **Core functionality**: MCP server, database operations, embeddings
+- **Smoke tests**: Basic MCP integration, end-to-end search workflow
+- **Attribution tests**: Semantic similarity demonstrations with visual output
+
 ## Development
 
 See [CLAUDE.md](CLAUDE.md) for development instructions and architecture details.

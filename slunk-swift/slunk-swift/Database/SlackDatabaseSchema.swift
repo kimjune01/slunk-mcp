@@ -1,7 +1,6 @@
 import Foundation
 import GRDB
 import SQLiteVec
-import NaturalLanguage
 
 // MARK: - Slack-Specific Database Schema with Deduplication
 
